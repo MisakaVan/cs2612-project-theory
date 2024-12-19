@@ -1,0 +1,6 @@
+[submodule "sets"]
+	path = sets
+	url = https://bitbucket.org/qinxiang-SJTU/sets.git
+[submodule "compcert_lib"]
+	path = compcert_lib
+	url = https://bitbucket.org/WxWyashen/compcert_lib.git
