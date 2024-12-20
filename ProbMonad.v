@@ -221,9 +221,82 @@ Theorem ProbDistr_compute_pr_exists: forall d, exists r,
 Proof.
 Admitted. (** Level 1 *)
 
+Lemma map_fst_map_pair:
+  forall (T A B: Type),
+  forall (lt: list T),
+  forall (f: T -> (A * B)),
+  map fst (map f lt) = map (fun x => fst (f x)) lt.
+Proof.
+  intros.
+  revert lt.
+  induction lt.
+  - simpl.
+    reflexivity.
+  - simpl.
+    rewrite IHlt.
+    reflexivity.
+Qed.
+
+Lemma map_snd_map_pair:
+  forall (T A B: Type),
+  forall (lt: list T),
+  forall (f: T -> (A * B)),
+  map snd (map f lt) = map (fun x => snd (f x)) lt.
+Proof.
+  intros.
+  revert lt.
+  induction lt.
+  - simpl.
+    reflexivity.
+  - simpl.
+    rewrite IHlt.
+    reflexivity.
+Qed.
+
 #[export] Instance ProbDistr_imply_event_refl:
   Reflexive ProbDistr.imply_event.
-Admitted. (** Level 1 *)
+Proof.
+  unfold ProbDistr.imply_event, Reflexive.
+  intros.
+  exists ((map (fun p: Prop => ([p], [p])) x.(pset))).
+  repeat split.
+  - rewrite map_fst_map_pair.
+    simpl.
+    induction x.(pset).
+    * simpl.
+      reflexivity.
+    * simpl.
+      (* Search (Permutation (?a :: _) (?a :: _)). *)
+      apply perm_skip.
+      apply IHl.   
+  - rewrite map_snd_map_pair.
+    simpl.
+    induction x.(pset).
+    * simpl.
+      reflexivity.
+    * simpl.
+      (* Search (Permutation (?a :: _) (?a :: _)). *)
+      apply perm_skip.
+      apply IHl.   
+  - simpl.
+    intros.
+    (* Search (In _ (map _ _)). *)
+    rewrite -> in_map_iff in H.
+    destruct H as [P [? ?]].
+    (* Search ((_, _)=(_, _)). *)
+    apply pair_equal_spec in H; destruct H.
+    subst l1 l2.
+    simpl in *.
+    case H0, H1; try tauto.
+    subst P1 P.
+    tauto.
+  - intros.
+    apply in_map_iff in H.
+    destruct H as [P [? ?]].
+    apply pair_equal_spec in H; destruct H.
+    subst l1 l2.
+    reflexivity.
+Qed.
 
 Theorem ProbDistr_imply_event_refl_setoid:
   forall d1 d2, ProbDistr.equiv_event d1 d2 -> ProbDistr.imply_event d1 d2.
