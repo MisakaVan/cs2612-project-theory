@@ -349,12 +349,42 @@ Qed.
 
 Theorem ProbDistr_imply_event_refl_setoid:
   forall d1 d2, ProbDistr.equiv_event d1 d2 -> ProbDistr.imply_event d1 d2.
-Admitted. (** Level 1 *)
+Proof. (** Level 1 *)
+  intros.
+  unfold ProbDistr.equiv_event, ProbDistr.imply_event in *.
+  destruct H as [L [? [? [? ?]]]].
+  exists L.
+  repeat split.
+  - tauto.
+  - tauto.
+  - apply H1; tauto.
+  - apply H2; tauto.
+Qed.
 
 #[export] Instance ProbDistr_equiv_equiv {A: Type}:
   Equivalence (@ProbDistr.equiv A).
-Proof.
-Admitted. (** Level 1 *)
+Proof. (** Level 1 *)
+  unfold ProbDistr.equiv.
+  split.
+  - unfold Reflexive.
+    intros.
+    split; intros.
+    + reflexivity.
+    + apply Permutation_refl.
+  - unfold Symmetric.
+    intros.
+    destruct H.
+    split; intros.
+    + rewrite H; reflexivity.
+    + rewrite H0;reflexivity.
+  - unfold Transitive.
+    intros.
+    destruct H, H0.
+    split; intros.
+    + rewrite H, H0; reflexivity.
+    + apply Permutation_trans with (l' := y.(pset)); tauto.
+    (* + Search (Permutation _ _ -> Permutation _ _ -> Permutation _ _).  *)
+Qed.
 
 #[export] Instance ProbDistr_imply_event_trans:
   Transitive ProbDistr.imply_event.
