@@ -219,7 +219,56 @@ Notation "x '.(legal_prob_1)'" := (ProbDistr.legal_prob_1 _ x) (at level 1).
 Theorem ProbDistr_compute_pr_exists: forall d, exists r,
   ProbDistr.compute_pr d r.
 Proof.
-Admitted. (** Level 1 *)
+  intro d.
+  unfold ProbDistr.compute_pr.
+  induction d.(pset) as [| a pset IH].
+  + exists 0%R.
+    exists [].
+    split; intros.
+    - split; intros.
+      * inversion H.
+      * destruct H as [? _].
+        inversion H.
+    - reflexivity.
+  + destruct IH as [r [l [? ?]]].
+    destruct (classic a) as [Ha | Hna].
+    - exists (r + d.(prob) a)%R.
+      exists (a :: l).
+      split; intros.
+      * split; intros.
+        --  pose proof H P.
+            destruct H1.
+            ++  subst.
+                split.
+                ** left. reflexivity.
+                ** tauto.
+            ++  split.
+                ** right. apply H2. tauto.
+                ** tauto.
+        --  destruct H1.
+            destruct H1.
+            ++ subst. left. reflexivity.
+            ++ right. apply H. tauto.
+      * simpl. rewrite <- H0.
+        rewrite Rplus_comm.
+        reflexivity.
+    - exists r.
+      exists l.
+      split; intros.
+      * split; intros.
+        --  pose proof H P.
+            subst. split.
+            ++ right. apply H2. tauto.
+            ++ tauto.
+        --  destruct H1.
+            destruct H1.
+            ++ subst. easy.
+            ++ apply H. tauto.
+      * rewrite H0.
+        reflexivity.
+Qed. 
+  
+(** Level 1 *)
 
 Lemma map_fst_map_pair:
   forall (T A B: Type),
