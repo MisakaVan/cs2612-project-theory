@@ -155,33 +155,6 @@ Definition equiv {A: Type} (d1 d2: Distr A): Prop :=
   (forall a: A, d1.(prob) a = d2.(prob) a) /\
   Permutation d1.(pset) d2.(pset).
 
-Definition imply_event (d1 d2: Distr Prop): Prop :=
-  exists L: list (list Prop * list Prop),
-    Permutation d1.(pset) (concat (map fst L)) /\
-    Permutation d2.(pset) (concat (map snd L)) /\
-    (forall l1 l2,
-       In (l1, l2) L ->
-       forall P1, In P1 l1 ->
-       forall P2, In P2 l2 ->
-       In P2 l2 ->
-       (P1 -> P2)) /\
-    (forall l1 l2,
-       In (l1, l2) L ->
-       sum_prob l1 d1.(prob) = sum_prob l2 d2.(prob)).
-
-Definition equiv_event (d1 d2: Distr Prop): Prop :=
-  exists L: list (list Prop * list Prop),
-    Permutation d1.(pset) (concat (map fst L)) /\
-    Permutation d2.(pset) (concat (map snd L)) /\
-    (forall l1 l2,
-       In (l1, l2) L ->
-       forall P1, In P1 l1 ->
-       forall P2, In P2 l2 ->
-       In P2 l2 ->
-       (P1 <-> P2)) /\
-    (forall l1 l2,
-       In (l1, l2) L ->
-       sum_prob l1 d1.(prob) = sum_prob l2 d2.(prob)).
 
 Definition is_det {A: Type} (a: A) (d: Distr A): Prop :=
   d.(pset) = [a] /\ d.(prob) a = 1%R /\
@@ -205,6 +178,18 @@ Definition compute_pr (d: Distr Prop) (r: R): Prop :=
   exists (l: list Prop),
     (forall P, In P l <-> In P d.(pset) /\ P) /\
     sum_prob l d.(prob) = r.
+
+Definition imply_event (d1 d2: Distr Prop): Prop :=
+  exists r1 r2,
+    compute_pr d1 r1 /\
+    compute_pr d2 r2 /\
+    (r1 <= r2)%R.
+
+Definition equiv_event (d1 d2: Distr Prop): Prop :=
+  exists r1 r2,
+    compute_pr d1 r1 /\
+    compute_pr d2 r2 /\
+    (r1 = r2)%R.
 
 End ProbDistr.
 
