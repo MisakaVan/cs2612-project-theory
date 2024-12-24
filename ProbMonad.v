@@ -177,7 +177,8 @@ Record sum_distr {A: Type}
 Definition compute_pr (d: Distr Prop) (r: R): Prop :=
   exists (l: list Prop),
     (forall P, In P l <-> In P d.(pset) /\ P) /\
-    sum_prob l d.(prob) = r.
+    (sum_prob l d.(prob) = r) /\
+    NoDup l.
 
 Definition imply_event (d1 d2: Distr Prop): Prop :=
   exists r1 r2,
@@ -214,29 +215,64 @@ Proof.
       * inversion H.
       * destruct H as [? _].
         inversion H.
-    - reflexivity.
+    - split. reflexivity. constructor.
   + destruct IH as [r [l [? ?]]].
     destruct (classic a) as [Ha | Hna].
+    {
+      destruct (classic (In a l)) as [Hin | Hnin].
+      - exists r.
+        exists l.
+        split; intros.
+        --
+          pose proof H P.
+          destruct H1.
+          split.
+          ++
+            intros.
+            destruct H1; auto.
+            split; auto.
+            apply in_cons; auto.
+          ++
+            intros [? ?].
+            destruct H3.
+            subst.
+            auto.
+            tauto.
+        --
+          auto.
     - exists (r + d.(prob) a)%R.
       exists (a :: l).
       split; intros.
-      * split; intros.
-        --  pose proof H P.
+        --
+          split; intros.
+          ++
+            pose proof H P.
             destruct H1.
-            ++  subst.
                 split.
-                ** left. reflexivity.
-                ** tauto.
-            ++  split.
-                ** right. apply H2. tauto.
-                ** tauto.
-        --  destruct H1.
+            * left. auto.
+            * subst. auto.
+            * destruct H2.
+              specialize (H2 H1) as [? ?].
+              split; auto.
+              apply in_cons; auto.
+          ++
             destruct H1.
-            ++ subst. left. reflexivity.
-            ++ right. apply H. tauto.
-      * simpl. rewrite <- H0.
+            destruct H1.
+            * subst. left. auto.
+            * right. apply H. tauto.
+        
+        --
+          split.
+          ++
+            simpl.
+            destruct H0.
+            rewrite <- H0.
         rewrite Rplus_comm.
         reflexivity.
+          ++
+            destruct H0 as [_ H_nodup_l].
+            constructor; auto.
+    }
     - exists r.
       exists l.
       split; intros.
@@ -249,8 +285,9 @@ Proof.
             destruct H1.
             ++ subst. easy.
             ++ apply H. tauto.
-      * rewrite H0.
-        reflexivity.
+      * destruct H0.
+        rewrite H0.
+        auto.
 Qed. 
   
 (** Level 1 *)
