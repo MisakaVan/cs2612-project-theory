@@ -202,6 +202,43 @@ Notation "x '.(legal_nonneg)'" := (ProbDistr.legal_nonneg _ x) (at level 1).
 Notation "x '.(legal_pset_valid)'" := (ProbDistr.legal_pset_valid _ x) (at level 1).
 Notation "x '.(legal_prob_1)'" := (ProbDistr.legal_prob_1 _ x) (at level 1).
 
+(* Lemmas *)
+
+#[export] Instance sum_congr :
+  Proper (Permutation (A:=R) ==> eq) (sum).
+Admitted. (** TODO *)
+
+Lemma perm_map:
+  forall (A B: Type) (f: A -> B) (l1 l2: list A),
+    Permutation l1 l2 ->
+    Permutation (map f l1) (map f l2).
+Proof.
+  intros.
+  induction H.
+  - constructor.
+  - simpl.
+    constructor.
+    assumption.
+  - simpl.
+    constructor.
+  - apply Permutation_trans with (l' := map f l'); assumption.
+Qed.
+
+#[export] Instance sum_prob_congr {A: Type}:
+  Proper (Permutation (A:=A) ==> eq ==> eq) (@sum_prob A).
+Proof.
+  unfold Proper, respectful.
+  intros l1 l2 Hl r1 r2 ?.
+  subst r2.
+  unfold sum_prob.
+  enough (Permutation (map r1 l1) (map r1 l2)). {
+    apply sum_congr.
+    assumption.
+  }
+  apply perm_map.
+  assumption.
+Qed.
+
 Theorem ProbDistr_compute_pr_exists: forall d, exists r,
   ProbDistr.compute_pr d r.
 Proof.
@@ -240,15 +277,15 @@ Proof.
             tauto.
         --
           auto.
-    - exists (r + d.(prob) a)%R.
-      exists (a :: l).
-      split; intros.
+      - exists (r + d.(prob) a)%R.
+        exists (a :: l).
+        split; intros.
         --
           split; intros.
           ++
             pose proof H P.
             destruct H1.
-                split.
+            split.
             * left. auto.
             * subst. auto.
             * destruct H2.
@@ -267,8 +304,8 @@ Proof.
             simpl.
             destruct H0.
             rewrite <- H0.
-        rewrite Rplus_comm.
-        reflexivity.
+            rewrite Rplus_comm.
+            reflexivity.
           ++
             destruct H0 as [_ H_nodup_l].
             constructor; auto.
@@ -291,6 +328,48 @@ Proof.
 Qed. 
   
 (** Level 1 *)
+Definition valid_prop_sublist(l t: list Prop): Prop :=
+  forall P, In P t <-> In P l /\ P.
+
+Theorem nodup_valid_prop_sublist_perm:
+  forall l t1 t2,
+    NoDup t1 -> NoDup t2 ->
+    valid_prop_sublist l t1 ->
+    valid_prop_sublist l t2 ->
+    Permutation t1 t2.
+Proof.
+  intros l t1 t2 H_nodup1 H_nodup2 H_valid1 H_valid2.
+  unfold valid_prop_sublist in *.
+  apply NoDup_Permutation; auto.
+  intros P.
+  specialize (H_valid1 P).
+  specialize (H_valid2 P).
+  tauto.
+Qed.
+
+Theorem compute_pr_same:
+  forall d r1 r2,
+    ProbDistr.compute_pr d r1 ->
+    ProbDistr.compute_pr d r2 ->
+    r1 = r2.
+Proof.
+  intros.
+  destruct H as [l1 [? [? ?]]].
+  destruct H0 as [l2 [? [? ?]]].
+  enough (Permutation l1 l2). {
+    subst.
+    apply sum_prob_congr; auto.
+  }
+  apply NoDup_Permutation; auto.
+  intros P.
+  split; intros.
+  - apply H0.
+    apply H.
+    tauto.
+  - apply H.
+    apply H0.
+    tauto.
+Qed.
 
 Lemma map_fst_map_pair:
   forall (T A B: Type),
@@ -327,46 +406,12 @@ Qed.
 #[export] Instance ProbDistr_imply_event_refl:
   Reflexive ProbDistr.imply_event.
 Proof.
-  unfold ProbDistr.imply_event, Reflexive.
+  unfold Reflexive, ProbDistr.imply_event.
   intros.
-  exists ((map (fun p: Prop => ([p], [p])) x.(pset))).
-  repeat split.
-  - rewrite map_fst_map_pair.
-    simpl.
-    induction x.(pset).
-    * simpl.
-      reflexivity.
-    * simpl.
-      (* Search (Permutation (?a :: _) (?a :: _)). *)
-      apply perm_skip.
-      apply IHl.   
-  - rewrite map_snd_map_pair.
-    simpl.
-    induction x.(pset).
-    * simpl.
-      reflexivity.
-    * simpl.
-      (* Search (Permutation (?a :: _) (?a :: _)). *)
-      apply perm_skip.
-      apply IHl.   
-  - simpl.
-    intros.
-    (* Search (In _ (map _ _)). *)
-    rewrite -> in_map_iff in H.
-    destruct H as [P [? ?]].
-    (* Search ((_, _)=(_, _)). *)
-    apply pair_equal_spec in H; destruct H.
-    subst l1 l2.
-    simpl in *.
-    case H0, H1; try tauto.
-    subst P1 P.
-    tauto.
-  - intros.
-    apply in_map_iff in H.
-    destruct H as [P [? ?]].
-    apply pair_equal_spec in H; destruct H.
-    subst l1 l2.
-    reflexivity.
+  pose proof ProbDistr_compute_pr_exists x as [r ?].
+  exists r, r.
+  repeat split; auto.
+  apply Rle_refl.
 Qed.
 
 Theorem ProbDistr_imply_event_refl_setoid:
@@ -374,13 +419,11 @@ Theorem ProbDistr_imply_event_refl_setoid:
 Proof. (** Level 1 *)
   intros.
   unfold ProbDistr.equiv_event, ProbDistr.imply_event in *.
-  destruct H as [L [? [? [? ?]]]].
-  exists L.
-  repeat split.
-  - tauto.
-  - tauto.
-  - apply H1; tauto.
-  - apply H2; tauto.
+  destruct H as [r1 [r2 [? [? ?]]]].
+  exists r1, r2.
+  repeat split; auto.
+  rewrite H1.
+  apply Rle_refl.
 Qed.
 
 #[export] Instance ProbDistr_equiv_equiv {A: Type}:
@@ -408,13 +451,62 @@ Proof. (** Level 1 *)
     (* + Search (Permutation _ _ -> Permutation _ _ -> Permutation _ _).  *)
 Qed.
 
+
+
 #[export] Instance ProbDistr_imply_event_trans:
   Transitive ProbDistr.imply_event.
-Admitted. (** Level 1 *)
+Proof.
+  unfold Transitive, ProbDistr.imply_event.
+  intros x y z.
+  intros [r1 [r2 [? [? ?]]]] [r2' [r3 [? [? ?]]]].
+  exists r1, r3.
+  repeat split; auto.
+  enough (r2 = r2'). {
+    subst r2'.
+    Search (_ <= _ -> _ <= _ -> _ <= _)%R.
+    pose proof Rle_trans _ _ _ H1 H4.
+    auto.
+  }
+  clear H1 H4 H H3.
+  unfold ProbDistr.compute_pr in *.
+  destruct H0 as [l2  [? [? ?]]].
+  destruct H2 as [l2' [? [? ?]]].
+  apply compute_pr_same with (d := y).
+  all: unfold ProbDistr.compute_pr.
+  - exists l2.
+    auto.
+  - exists l2'.
+    auto.    
+Qed.
 
 #[export] Instance ProbDistr_equiv_event_equiv:
   Equivalence ProbDistr.equiv_event.
-Admitted. (** Level 1 *)
+Proof.
+  unfold ProbDistr.equiv_event.
+  split.
+  - unfold Reflexive.
+    intros.
+    pose proof ProbDistr_compute_pr_exists x as [r ?].
+    exists r, r.
+    repeat split; auto.
+  - unfold Symmetric.
+    intros.
+    destruct H as [r1 [r2 [? [? ?]]]].
+    exists r2, r1.
+    repeat split; auto.
+  - unfold Transitive.
+    intros.
+    destruct H as [r1 [r2 [? [? ?]]]].
+    destruct H0 as [r2' [r3 [? [? ?]]]].
+    exists r1, r3.
+    repeat split; auto.
+    enough (r2 = r2'). {
+      repeat subst.
+      reflexivity.
+    }
+    clear H H3 x z r1 r3 H2 H4.
+    apply compute_pr_same with (d := y); auto.
+Qed.
 
 #[export] Instance ProbDistr_imply_event_congr:
   Proper (ProbDistr.equiv_event ==>
