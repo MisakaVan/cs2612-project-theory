@@ -206,7 +206,22 @@ Notation "x '.(legal_prob_1)'" := (ProbDistr.legal_prob_1 _ x) (at level 1).
 
 #[export] Instance sum_congr :
   Proper (Permutation (A:=R) ==> eq) (sum).
-Admitted. (** TODO *)
+Proof.
+  unfold Proper, respectful.
+  intros l1 l2 H.
+  induction H.
+  - reflexivity.
+  - simpl.
+    f_equal.
+    assumption.
+  - simpl.
+    rewrite Rplus_comm.
+    rewrite Rplus_assoc.
+    f_equal.
+    rewrite Rplus_comm.
+    reflexivity.
+  - transitivity (sum l'); assumption.
+Qed.
 
 Lemma perm_map:
   forall (A B: Type) (f: A -> B) (l1 l2: list A),
