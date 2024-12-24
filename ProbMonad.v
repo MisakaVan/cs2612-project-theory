@@ -526,11 +526,57 @@ Qed.
 #[export] Instance ProbDistr_imply_event_congr:
   Proper (ProbDistr.equiv_event ==>
           ProbDistr.equiv_event ==> iff) ProbDistr.imply_event.
-Admitted. (** Level 1 *)
+Proof.
+  unfold Proper, respectful.
+  intros x y H x0 y0 H0.
+  split; intros.
+  - unfold ProbDistr.imply_event in *.
+    destruct H1 as [r1 [r2 [? [? ?]]]].
+    exists r1, r2.
+    repeat split; auto.
+    + unfold ProbDistr.equiv_event in H.
+      destruct H as [r1' [r2' [? [? ?]]]].
+      pose proof compute_pr_same _ _ _ H H1.
+      subst.
+      auto.
+    + unfold ProbDistr.equiv_event in H0.
+      destruct H0 as [r1' [r2' [? [? ?]]]].
+      pose proof compute_pr_same _ _ _ H0 H2.
+      subst.
+      auto.
+  - unfold ProbDistr.imply_event in *.
+    destruct H1 as [r1 [r2 [? [? ?]]]].
+    exists r1, r2.
+    repeat split; auto.
+    + unfold ProbDistr.equiv_event in H.
+      destruct H as [r1' [r2' [? [? ?]]]].
+      pose proof compute_pr_same _ _ _ H4 H1.
+      subst.
+      auto.
+    + unfold ProbDistr.equiv_event in H0.
+      destruct H0 as [r1' [r2' [? [? ?]]]].
+      pose proof compute_pr_same _ _ _ H4 H2.
+      subst.
+      auto.
+Qed.  
 
 #[export] Instance ProbDistr_compute_pr_congr:
   Proper (ProbDistr.equiv_event ==> Sets.equiv) ProbDistr.compute_pr.
-Admitted. (** Level 1 *)
+Proof.
+  unfold Proper, respectful.
+  intros x y H.
+  destruct H as [r1 [r2 [H1 [H2 Heq]]]].
+  sets_unfold.
+  split.
+  - intros Ha.
+    pose proof compute_pr_same _ _ _ H1 Ha.
+    subst.
+    auto.
+  - intros Ha.
+    pose proof compute_pr_same _ _ _ H2 Ha.
+    subst.
+    auto.
+Qed.
 
 Theorem ProbDistr_compute_pr_mono:
   forall f1 f2 r1 r2,
@@ -538,7 +584,14 @@ Theorem ProbDistr_compute_pr_mono:
     ProbDistr.compute_pr f2 r2 ->
     ProbDistr.imply_event f1 f2 ->
     (r1 <= r2)%R.
-Admitted. (** Level 1 *)
+Proof.
+  intros f1 f2 r1 r2 comp1 comp2 imp.
+  destruct imp as [r1' [r2' [comp1' [comp2' ?]]]].
+  pose proof compute_pr_same _ _ _ comp1 comp1'.
+  pose proof compute_pr_same _ _ _ comp2 comp2'.
+  subst.
+  auto.
+Qed.
 
 (*********************************************************)
 (**                                                      *)
