@@ -9,6 +9,10 @@ Import SetsNotation.
 Local Open Scope sets.
 Local Open Scope list.
 
+(* claim forall type A, x,y of A, it holds that {x=y} + {x<>y}. *)
+Axiom eq_dec: forall {A: Type} (x y: A), {x = y} + {x <> y}.
+
+
 Theorem equiv_in_domain:
   forall {A B: Type} (f: A -> B) (R: B -> B -> Prop),
     Equivalence R ->
