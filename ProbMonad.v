@@ -4,6 +4,7 @@ Require Import Coq.Sorting.Permutation.
 Require Import SetsClass.SetsClass.
 Require Import Coq.Classes.Morphisms.
 Require Import Coq.Lists.List. Import ListNotations.
+Require Import Coq.Lists.ListSet.
 Require Import Coq.Logic.Classical_Prop.
 Import SetsNotation.
 Local Open Scope sets.
@@ -126,6 +127,88 @@ Proof.
     apply (H0 a); tauto.
 Qed.
 
+(*********************************************************)
+(**                                                      *)
+(** List Operation                                       *)
+(**                                                      *)
+(*********************************************************)
+
+
+(* use ListSet to define *)
+
+Definition filter_dup {A: Type} (l: list A): list A :=
+  fold_right (fun a: A => fun s: set A => set_add eq_dec a s) (empty_set A) l.
+
+Lemma filter_dup_nodup {A: Type}:
+  forall (l: list A),
+    NoDup (filter_dup l).
+Proof.
+  intros.
+  induction l as [| a l IH].
+  - simpl.
+    constructor.
+  - simpl.
+    apply set_add_nodup.
+    auto.
+Qed.
+
+Lemma filter_dup_incl {A: Type}:
+  forall (l: list A),
+    forall x, In x l <-> In x (filter_dup l).
+Proof.
+  intros.
+  induction l as [| a l IH].
+  - simpl.
+    split; intros.
+    + inversion H.
+    + inversion H.
+  - destruct (eq_dec x a).
+    + subst.
+      simpl.
+      split; intros.
+      * destruct H.
+        {
+          apply set_add_intro2.
+          reflexivity.
+        }
+        {
+          apply set_add_intro1.
+          apply IH.
+          auto.
+        }
+      * apply set_add_elim in H.
+        destruct H.
+        {
+          auto.
+        }
+        {
+          right.
+          apply IH.
+          auto.
+        }
+    + simpl.
+      split; intros.
+      * destruct H.
+        {
+          subst; absurd (x<>x); auto.
+        }
+        {
+          apply set_add_intro1.
+          apply IH.
+          auto.
+        }
+      * apply set_add_elim in H.
+        destruct H.
+        {
+          subst.
+          absurd (a<>a); auto.
+        }
+        {
+          right.
+          apply IH.
+          auto.
+        }
+Qed.
 (*********************************************************)
 (**                                                      *)
 (** Probability Distribution                             *)
@@ -836,8 +919,40 @@ Proof.
     destruct H_d_is_bind_f_g as [da [l [H_da_in_f [H_forall2 H_sum_distr]]]].
     split.
     (* TODO *)
+    assert 
+    (Forall2 (fun (a : A) '(r, d') => r = da.(prob) a /\ d' ∈ g a) da.(pset) l)
+    as H_forall2'. {
+      apply H_forall2.
+    }
   }
-Admitted.
+(* Admitted. *)
+
+
+  {
+    sets_unfold.
+    intros d1 d2 H_d1_is_bind_f_g H_d2_is_bind_f_g.
+    unfold __bind in *.
+    destruct H_d1_is_bind_f_g as [da1 [l1 [H_da1_in_f [H_forall2_1 H_sum_distr_1]]]].
+    destruct H_d2_is_bind_f_g as [da2 [l2 [H_da2_in_f [H_forall2_2 H_sum_distr_2]]]].
+    split.
+    {
+      intros b.
+      destruct H_sum_distr_1 as [_ H_sum_prob_valid_1].
+      destruct H_sum_distr_2 as [_ H_sum_prob_valid_2].
+      rewrite H_sum_prob_valid_1, H_sum_prob_valid_2.
+      clear H_sum_prob_valid_1 H_sum_prob_valid_2.
+      pose proof (Legal_unique f) H_legal_f _ _ H_da1_in_f H_da2_in_f as H_equiv_da1_da2.
+      destruct H_equiv_da1_da2 as [H_prob_equiv_da12 H_pset_perm_da12].
+      enough 
+      (Permutation (map (fun '(r, d) => (r * d.(prob) b)%R) l1) 
+                   (map (fun '(r, d) => (r * d.(prob) b)%R) l2)). {
+        apply sum_congr.
+        assumption.
+      }
+
+    }
+  }
+
 
 Definition bind {A B: Type} (f: M A) (g: A -> M B): M B :=
   {|
