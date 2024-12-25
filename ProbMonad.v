@@ -705,6 +705,16 @@ Definition ret {A: Type} (a: A) : M A :=
     legal := __ret_Legal a;
   |}.
 
+(* 
+  概率单子的bind操作如下定义：
+  给定一个概率单子 f: Distr A -> Prop （即 f 是一个 Distr A 的集合），
+  一个函数 g: A -> Distr B -> Prop （即 g 是一个从 A 到 Distr B 的集合的函数），
+  得到的是一个 Distr B -> Prop，即一个 Distr B 的集合。
+  每个 s2 ∈ __bind f g 都满足以下条件：
+  存在一个 s1 ∈ f；
+  对于 s1 的每个元素 a，其概率是 prob a，被 g a 映射到的集合内存在一个分布 d；
+  s2 上的概率是 prob a 乘以 d.(prob) a 对于 s1 的每个元素 a 求和。
+*)
 Definition __bind {A B: Type}
                   (f: Distr A -> Prop)
                   (g: A -> Distr B -> Prop)
@@ -717,11 +727,116 @@ Definition __bind {A B: Type}
       s1.(pset) l /\
     ProbDistr.sum_distr l s2.
 
+Lemma in_in_app_app:
+  forall {A: Type} (a: A) (l1 l2 l0: list A),
+    (
+      In a l1 -> In a l2
+    ) ->
+    (
+      In a (l0 ++ l1) -> In a (l0 ++ l2)
+    ).
+Proof.
+  intros.
+  - apply in_app_or in H0.
+    apply in_or_app.
+    destruct H0.
+    + left. auto.
+    + right. apply H. auto.
+Qed.
+
 Lemma __bind_legal {A B: Type}:
   forall (f: Distr A -> Prop) (g: A -> Distr B -> Prop),
     Legal f ->
     (forall a, Legal (g a)) ->
     Legal (__bind f g).
+Proof.
+  intros f g H_legal_f H_all_legal_g.
+  split.
+  {
+    sets_unfold.
+    unfold __bind.
+    destruct H_legal_f as [[da Hda] H_legal_f H_unique_f].
+    specialize (H_legal_f da Hda).
+    destruct H_legal_f as [Hda_nodup Hda_nonneg Hda_pset_valid Hda_prob_1].
+    clear Hda_prob_1.
+    clear Hda_pset_valid.
+
+    enough (
+      exists  (s1 : Distr A) (d : Distr B) (l : list (R * Distr B)),
+        s1 ∈ f /\
+        Forall2 (fun (a : A) '(r, d0) => r = s1.(prob) a /\ d0 ∈ g a)
+          s1.(pset) l /\ ProbDistr.sum_distr l d
+    ) by firstorder.
+    exists da.
+    induction da.(pset) as [| a pset IH].
+    2: {
+      (* Search (NoDup (_ :: _)). *)
+      pose proof NoDup_cons_iff a pset as [H_nodup _].
+      specialize (H_nodup Hda_nodup).
+      destruct H_nodup as [_ H_nodup].
+      specialize (IH H_nodup).
+      clear H_nodup.
+      destruct IH as [d_induction [l_induction [IH1 [IH2 IH3]]]].
+      enough (
+        exists (l : list (R * Distr B)),
+          da ∈ f /\
+          Forall2 (fun (a0 : A) '(r, d0) => r = da.(prob) a0 /\ d0 ∈ g a0)
+            (a :: pset) l /\ 
+            (exists (d : Distr B), ProbDistr.sum_distr l d)
+      ) by firstorder.
+      pose proof H_all_legal_g a as H_legal_g_a.
+      destruct H_legal_g_a as [H_exists_g_a H_legal_g_a H_unique_g_a].
+      destruct H_exists_g_a as [ga Hd0].
+
+      exists ((da.(prob) a, ga) :: l_induction).
+      split; auto.
+      split.
+      - constructor; auto.
+      - exists {| 
+                  ProbDistr.pset := ga.(pset) ++ d_induction.(pset);
+                  ProbDistr.prob := (fun b: B => (da.(prob) a * ga.(prob) b +
+                  sum (map (fun '(r, d) => r * d.(prob) b) l_induction))%R )
+               |}.
+        split; simpl.
+        +
+          intros b.
+          split.
+          * apply in_in_app_app.
+            intros.
+            destruct IH3 as [IH3 _].
+            apply IH3.
+            auto.
+          * apply in_in_app_app.
+            intros.
+            destruct IH3 as [IH3 _].
+            apply IH3.
+            auto.
+        +
+          intros b.
+          reflexivity.
+    }
+    enough(
+      exists (l : list (R * Distr B)),
+        da ∈ f /\
+        Forall2 (fun (a : A) '(r, d0) => r = da.(prob) a /\ d0 ∈ g a) [] l /\
+        (exists (d : Distr B), ProbDistr.sum_distr l d)
+    ) by firstorder.
+    exists [].
+    split; auto.
+    split.
+    * constructor.
+    * exists {| ProbDistr.pset := [];
+               ProbDistr.prob := (fun b: B => 0%R) |}.
+      split; simpl; intros; auto; split; auto.
+  } (* Existence finished *)
+  {
+    sets_unfold.
+    intros d H_d_is_bind_f_g.
+    unfold __bind in H_d_is_bind_f_g.
+    destruct H_d_is_bind_f_g as [da [l [H_da_in_f [H_forall2 H_sum_distr]]]].
+    split.
+    (* TODO *)
+  }
 Admitted.
 
 Definition bind {A B: Type} (f: M A) (g: A -> M B): M B :=
