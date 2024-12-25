@@ -623,8 +623,81 @@ Arguments legal {_} _.
 Definition __ret {A: Type} (a: A) : Distr A -> Prop :=
   ProbDistr.is_det a.
 
-Lemma __ret_Legal {A: Type}: forall a: A, Legal (__ret a).
-Admitted.
+Lemma __ret_Legal {A: Type}: 
+  forall a: A, Legal (__ret a).
+Proof.
+  intros.
+  constructor.
+  - exists {| ProbDistr.prob := (fun a' => if eq_dec a a' then 1%R else 0%R);
+              ProbDistr.pset := [a] |}.
+    sets_unfold.
+    unfold __ret.
+    unfold ProbDistr.is_det.
+    repeat split; simpl.
+    +
+      destruct (eq_dec a a).
+      * reflexivity.
+      * tauto.
+    + intros.
+      destruct (eq_dec a b).
+      * subst.
+        contradiction.
+      * reflexivity.
+
+  - sets_unfold.
+    intros.
+    unfold __ret in *.
+    unfold ProbDistr.is_det in *.
+    destruct H as [? [? ?]].
+    split.
+    + rewrite H.
+      constructor; simpl; auto.
+      apply NoDup_nil.
+    + intros.
+      destruct (eq_dec a a0).
+      * subst.
+        rewrite H0.
+        (* Search (_ <= _ -> _ >= _)%R. *)
+        apply Rle_ge.
+        apply Rle_0_1.
+      * specialize (H1 a0 n).
+        rewrite H1.
+        apply Rle_refl.
+    + intros.
+      destruct (eq_dec a a0).
+      * subst.
+        rewrite H.
+        simpl; auto.
+      * specialize (H1 a0 n).
+        rewrite H1 in H2.
+        pose proof Rgt_irrefl 0%R.
+        contradiction.
+    + rewrite H.
+      unfold sum_prob.
+      simpl.
+      rewrite H0.
+      apply Rplus_0_r.
+  - sets_unfold.
+    intros.
+    unfold __ret in *.
+    unfold ProbDistr.is_det in *.
+    destruct H as [? [? ?]].
+    destruct H0 as [? [? ?]].
+    unfold ProbDistr.equiv.
+    split; intros.
+    + destruct (eq_dec a a0).
+      * subst.
+        rewrite H3, H1.
+        reflexivity.
+      * specialize (H2 a0 n).
+        specialize (H4 a0 n).
+        rewrite H2.
+        rewrite H4.
+        reflexivity.
+    + rewrite H, H0.
+      reflexivity.
+Qed.
+        
 
 Definition ret {A: Type} (a: A) : M A :=
   {|
