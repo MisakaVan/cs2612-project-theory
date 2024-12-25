@@ -482,7 +482,7 @@ Proof.
   repeat split; auto.
   enough (r2 = r2'). {
     subst r2'.
-    Search (_ <= _ -> _ <= _ -> _ <= _)%R.
+    (* Search (_ <= _ -> _ <= _ -> _ <= _)%R. *)
     pose proof Rle_trans _ _ _ H1 H4.
     auto.
   }
