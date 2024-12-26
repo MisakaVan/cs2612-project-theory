@@ -282,8 +282,15 @@ Record sum_distr {A: Type}
                  (d0: Distr A): Prop :=
 {
   sum_pset_valid:
-    forall a, In a d0.(pset) <->
-              In a (concat (map (fun '(r, d) => d.(pset)) ds));
+    (* forall a, In a d0.(pset) <->
+              In a (concat (map (fun '(r, d) => d.(pset)) ds)); *)
+    Permutation
+        d0.(pset)
+      (
+        filter_dup
+        (concat (map (fun '(r, d) => d.(pset)) ds))
+      );
+
   sum_prob_valid:
     forall a, d0.(prob) a =
               sum (map (fun '(r, d) => r * d.(prob) a) ds)%R;
