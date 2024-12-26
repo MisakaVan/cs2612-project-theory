@@ -911,24 +911,22 @@ Proof.
       split.
       - constructor; auto.
       - exists {| 
-                  ProbDistr.pset := ga.(pset) ++ d_induction.(pset);
+                  ProbDistr.pset := filter_dup (ga.(pset) ++ d_induction.(pset));
                   ProbDistr.prob := (fun b: B => (da.(prob) a * ga.(prob) b +
                   sum (map (fun '(r, d) => r * d.(prob) b) l_induction))%R )
                |}.
         split; simpl.
         +
-          intros b.
-          split.
-          * apply in_in_app_app.
-            intros.
-            destruct IH3 as [IH3 _].
-            apply IH3.
-            auto.
-          * apply in_in_app_app.
-            intros.
-            destruct IH3 as [IH3 _].
-            apply IH3.
-            auto.
+          apply perm_filter_dup_cons.
+          destruct IH3.
+          assert (NoDup d_induction.(pset)) as H_nodup_d_induction. {
+            apply perm_filter_dup_nodup with (l2 := (concat (map (fun '(_, d) => d.(pset)) l_induction))).
+            assumption.
+          }
+          pose proof nodup_perm_filter_dup _ H_nodup_d_induction as H_perm_d_induction.
+          apply Permutation_trans with (l' := d_induction.(pset)).
+          * apply Permutation_sym; assumption.
+          * assumption.
         +
           intros b.
           reflexivity.
