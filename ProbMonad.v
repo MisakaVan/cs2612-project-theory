@@ -139,6 +139,8 @@ Qed.
 Definition filter_dup {A: Type} (l: list A): list A :=
   fold_right (fun a: A => fun s: set A => set_add eq_dec a s) (empty_set A) l.
 
+(* Lemmas and Theorems about filter_dup *)
+
 Lemma filter_dup_nodup {A: Type}:
   forall (l: list A),
     NoDup (filter_dup l).
@@ -209,6 +211,32 @@ Proof.
           auto.
         }
 Qed.
+
+
+Lemma perm_filter_dup_cons {A: Type}:
+  forall (l l1 l2: list A),
+    Permutation (filter_dup l1) (filter_dup l2) ->
+    Permutation (filter_dup (l ++ l1)) (filter_dup (l ++ l2)).
+Admitted.
+
+Lemma nodup_perm_filter_dup {A: Type}:
+  forall (l: list A),
+    NoDup l ->
+    Permutation l (filter_dup l).
+Admitted.
+
+Lemma perm_filter_dup_nodup {A: Type}:
+  forall (l1 l2: list A),
+    Permutation l1 (filter_dup l2) ->
+    NoDup l1.
+Proof.
+  intros.
+  pose proof filter_dup_nodup l2.
+  (* Search (Permutation). *)
+  pose proof Permutation_NoDup' H.
+  tauto.
+Qed.
+
 (*********************************************************)
 (**                                                      *)
 (** Probability Distribution                             *)
