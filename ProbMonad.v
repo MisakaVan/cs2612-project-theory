@@ -231,6 +231,32 @@ Proof.
   tauto.
 Qed.
 
+Lemma filter_dup_incl_list{A: Type}:
+  forall (lx l: list A),
+    incl lx l ->
+    incl lx (filter_dup l).
+Proof.
+  intros.
+  unfold incl in *.
+  intros.
+  apply filter_dup_in_inv.
+  apply H.
+  auto.
+Qed.
+
+Lemma filter_dup_incl_list_inv{A: Type}:
+  forall (lx l: list A),
+    incl lx (filter_dup l) ->
+    incl lx l.
+Proof.
+  intros.
+  unfold incl in *.
+  intros.
+  apply filter_dup_in.
+  apply H.
+  auto.
+Qed.
+
 Lemma perm_filter_dup_cons {A: Type}:
   forall (l l1 l2: list A),
     Permutation (filter_dup l1) (filter_dup l2) ->
@@ -295,6 +321,18 @@ Proof.
   tauto.
 Qed.
 
+Lemma in_listlist_concat_incl {A: Type}:
+  forall (l: list A) (ll: list (list A)),
+    In l ll ->
+    incl l (concat ll).
+Proof.
+  intros.
+  unfold incl.
+  intros.
+  apply in_concat.
+  exists l.
+  split; auto.
+Qed.
 
 (*********************************************************)
 (**                                                      *)
@@ -1584,16 +1622,18 @@ Proof.
       }
       apply sum_prob_cover_pset_1; auto.
       * apply filter_dup_nodup.
-      * 
-         (* TODO  *)
-
-      
-      
-
-  }
-(* Admitted. *)
-
-
+      * apply filter_dup_incl_list.
+        assert (
+          In d0.(pset)
+          (map (fun '(_, d1) => d1.(pset)) l)
+        ). {
+          pose proof in_map (fun '(_, d1) => d1.(pset)) l (r, d0) H_in_l.
+          simpl in H.
+          auto.
+        }
+        apply in_listlist_concat_incl.
+        auto.
+  }  (* Legal finished *)
   {
     sets_unfold.
     intros d1 d2 H_d1_is_bind_f_g H_d2_is_bind_f_g.
