@@ -231,6 +231,18 @@ Proof.
   tauto.
 Qed.
 
+Lemma filter_dup_in_iff {A: Type}:
+  forall (l: list A),
+    forall x, In x l <-> In x (filter_dup l).
+Proof.
+  intros.
+  split; intros.
+  - apply filter_dup_in_inv.
+    auto.
+  - apply filter_dup_in.
+    auto.
+Qed.
+
 Lemma filter_dup_incl_list{A: Type}:
   forall (lx l: list A),
     incl lx l ->
@@ -262,6 +274,23 @@ Lemma perm_filter_dup_cons {A: Type}:
     Permutation (filter_dup l1) (filter_dup l2) ->
     Permutation (filter_dup (l ++ l1)) (filter_dup (l ++ l2)).
 Admitted.
+
+Lemma perm_filter_dup_incl{A: Type}:
+  forall (l1 l2: list A),
+    (forall x, In x l1 <-> In x l2 ) ->
+              Permutation (filter_dup l1) (filter_dup l2).
+Proof.
+  (* Search (Permutation). *)
+  intros.
+  apply NoDup_Permutation.
+  - apply filter_dup_nodup.
+  - apply filter_dup_nodup.
+  - intros.
+    pose proof filter_dup_incl l1 x.
+    pose proof filter_dup_incl l2 x.
+    specialize (H x).
+    tauto.
+Qed.
 
 Lemma nodup_perm_filter_dup {A: Type}:
   forall (l: list A),
@@ -1980,11 +2009,99 @@ Proof.
       exact H.
     }
     {
-      (* TODO *)
-      admit.
+      destruct H_sum_distr_1 as [H_sum_pset_valid_1 _].
+      destruct H_sum_distr_2 as [H_sum_pset_valid_2 _].
+      rewrite H_sum_pset_valid_1, H_sum_pset_valid_2.
+      clear H_sum_pset_valid_1 H_sum_pset_valid_2.
+      (* Search filter_dup. *)
+      apply perm_filter_dup_incl.
+      intros b.
+      split.
+      {
+        intros H.
+        pose proof in_concat (map (fun '(_, d) => d.(pset)) l1) b as [H_inb _]; specialize (H_inb H).
+        destruct H_inb as [lb [H_lb H_inb]].
+        Search map.
+        pose proof in_map_iff (fun '(_, d) => d.(pset)) l1 lb as [H_lb_in_l1 _]; specialize (H_lb_in_l1 H_lb).
+        destruct H_lb_in_l1 as [db [H_db_eq H_db_in_l1]].
+        pose proof Forall2_in_r_exists _ _ _ H_forall2_1 _ H_db_in_l1.
+        destruct H0 as [a [? ?]].
+
+        assert (Permutation da1.(pset) da2.(pset)) as H_perm. {
+          destruct H_legal_f as [_ _ H_unique_f].
+          specialize (H_unique_f da1 da2 H_da1_in_f H_da2_in_f).
+          destruct H_unique_f as [? ?].
+          auto.
+        }
+        assert (In a da2.(pset)) as H_in_a2. {
+          apply Permutation_in with (l := da1.(pset)); auto.
+        }
+        pose proof Forall2_in_l_exists _ _ _ H_forall2_2 _ H_in_a2 as [b2 [? ?]].
+        destruct db.
+        destruct b2.
+        subst.
+        apply in_concat.
+        exists (d0.(pset)).
+        split; auto.
+        {
+          apply in_map_iff.
+          exists (r0, d0).
+          split; auto.
+        }
+        {
+          destruct H1, H3.
+          (* d and d0 all ∈ g a *)
+          pose proof H_all_legal_g a as [_ _ H_all_ga_legal].
+          specialize (H_all_ga_legal _ _ H4 H5).
+          destruct H_all_ga_legal as [_ Hperm].
+          pose proof Permutation_in _ Hperm H_inb.
+          auto.
+        }
+      }
+      {
+        intros H.
+        pose proof in_concat (map (fun '(_, d) => d.(pset)) l2) b as [H_inb _]; specialize (H_inb H).
+        destruct H_inb as [lb [H_lb H_inb]].
+        pose proof in_map_iff (fun '(_, d) => d.(pset)) l2 lb as [H_lb_in_l2 _]; specialize (H_lb_in_l2 H_lb).
+        destruct H_lb_in_l2 as [db [H_db_eq H_db_in_l2]].
+        pose proof Forall2_in_r_exists _ _ _ H_forall2_2 _ H_db_in_l2.
+        destruct H0 as [a [? ?]].
+
+        assert (Permutation da1.(pset) da2.(pset)) as H_perm. {
+          destruct H_legal_f as [_ _ H_unique_f].
+          specialize (H_unique_f da1 da2 H_da1_in_f H_da2_in_f).
+          destruct H_unique_f as [? ?].
+          auto.
+        }
+        assert (In a da1.(pset)) as H_in_a1. {
+          apply Permutation_in with (l := da2.(pset)); auto.
+          symmetry; auto.
+        }
+        pose proof Forall2_in_l_exists _ _ _ H_forall2_1 _ H_in_a1 as [b1 [? ?]].
+        destruct db.
+        destruct b1.
+        subst.
+        apply in_concat.
+        exists (d0.(pset)).
+        split; auto.
+        {
+          apply in_map_iff.
+          exists (r0, d0).
+          split; auto.
+        }
+        {
+          destruct H1, H3.
+          (* d and d0 all ∈ g a *)
+          pose proof H_all_legal_g a as [_ _ H_all_ga_legal].
+          specialize (H_all_ga_legal _ _ H4 H5).
+          destruct H_all_ga_legal as [_ Hperm].
+          pose proof Permutation_in _ Hperm H_inb.
+          auto.
+        }
+      }
     }
   }
-Admitted.
+Qed.
 
 
 Definition bind {A B: Type} (f: M A) (g: A -> M B): M B :=
