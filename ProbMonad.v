@@ -509,13 +509,34 @@ Lemma nodup_app_l {A: Type}:
   forall (l1 l2: list A),
     NoDup (l1 ++ l2) ->
     NoDup l1.
-Admitted.
+Proof.
+  intros.
+  induction l1 as [| a l1 IH].
+  - constructor.
+  - inversion H.
+    constructor.
+    + intro.
+      specialize (IH H3).
+      subst.
+      Search (In _ (_ ++ _)).
+      assert (In a (l1 ++ l2)) by (apply in_or_app; auto).
+      contradiction.
+    + subst.
+      auto.
+Qed.
 
 Lemma nodup_app_r {A: Type}:
   forall (l1 l2: list A),
     NoDup (l1 ++ l2) ->
     NoDup l2.
-Admitted.
+Proof.
+  intros.
+  induction l1 as [| a l1 IH].
+  - auto.
+  - inversion H.
+    apply IH.
+    auto.
+Qed.
 
 Lemma perm_nodup_app_l {A: Type}:
   forall (l1 l2 l3: list A),
