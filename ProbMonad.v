@@ -2828,9 +2828,69 @@ Proof. (** Level 2 *)
         lra.
 Qed.
 
+Lemma ProbDistr_imply_event_equiv_event:
+  forall d1 d2,
+    ProbDistr.imply_event d1 d2 ->
+    ProbDistr.imply_event d2 d1 ->
+    ProbDistr.equiv_event d1 d2.
+Proof.
+  intros d1 d2 H1 H2.
+  unfold ProbDistr.equiv_event.
+  unfold ProbDistr.imply_event in *.
+  destruct H1 as [r1 [r2 [H11 [H12 H13]]]].
+  destruct H2 as [r1' [r2' [H21 [H22 H23]]]].
+  pose proof compute_pr_same d1 r1 r2' H11 H22 as Heq1.
+  pose proof compute_pr_same d2 r2 r1' H12 H21 as Heq2.
+  subst r1' r2'.
+  assert (r1 = r2) as Heq by lra.
+  subst r2.
+  clear H23 H13 H12 H22.
+  exists r1, r1.
+  repeat split; auto.
+Qed.
+
+Lemma ProbMonad_imply_event_equiv_event:
+  forall f1 f2,
+    ProbMonad.imply_event f1 f2 ->
+    ProbMonad.imply_event f2 f1 ->
+    ProbMonad.equiv_event f1 f2.
+Proof.
+  intros f1 f2 H1 H2.
+  unfold ProbMonad.equiv_event.
+  unfold ProbMonad.imply_event in *.
+  destruct H1 as [d1 [d2 [H11 [H12 H13]]]].
+  destruct H2 as [d1' [d2' [H21 [H22 H23]]]].
+  pose proof f1.(legal).(Legal_unique) as H_unique_f1.
+  specialize (H_unique_f1 d1 d2' H11 H22).
+  apply ProbDistr_equiv_equiv_event in H_unique_f1.
+  pose proof f2.(legal).(Legal_unique) as H_unique_f2.
+  specialize (H_unique_f2 d2 d1' H12 H21).
+  apply ProbDistr_equiv_equiv_event in H_unique_f2.
+  exists d1, d2.
+  repeat split; auto.
+  pose proof ProbDistr_imply_event_refl_setoid d2 d1' H_unique_f2 as H_imp1.
+  apply symmetry in H_unique_f1.
+  pose proof ProbDistr_imply_event_refl_setoid d2' d1 H_unique_f1 as H_imp2.
+  assert (ProbDistr.imply_event d2 d1). {
+    transitivity d2'; auto.
+    transitivity d1'; auto.
+  }
+  pose proof ProbDistr_imply_event_equiv_event d1 d2 H13 H.
+  assumption.
+Qed.
+
 #[export] Instance ProbMonad_ret_congr_event:
   Proper (iff ==> ProbMonad.equiv_event) ret.
-Admitted. (** Level 2 *)
+Proof. (** Level 2 *)
+  unfold Proper, respectful.
+  intros P Q H.
+  destruct H as [Hpq Hqp].
+  pose proof ProbMonad_ret_mono_event as Hmono.
+  unfold Proper, Basics.impl in Hmono.
+  pose proof Hmono P Q Hpq.
+  pose proof Hmono Q P Hqp.
+  apply ProbMonad_imply_event_equiv_event; auto.
+Qed.
 
 Lemma bind_assoc:
   forall (A B C: Type)
