@@ -2669,17 +2669,41 @@ Proof. (** Level 2 *)
   unfold ProbMonad.equiv in *.
   sets_unfold.
   simpl.
-  intros x y H f g H0.
+  intros fx fy H f g H0.
   unfold ProbMonad.__bind.
   split.
   + intros.
-    destruct H1 as [dx [dy [Hdx [Hdy H_imp]]]].
-    exists dx, dy.
-    repeat split; auto.
-    - apply H.
-      auto.
-    -
-Admitted. 
+    destruct H1 as [d [l [Hd_in [Hforall2 H_sum_distr]]]].
+    exists d, l.
+    split; auto.
+    - apply H; auto.
+    - split; auto.
+      clear H_sum_distr.
+      induction Hforall2.
+      * constructor.
+      * destruct y.
+        constructor.
+        -- split.
+            ++ apply H1.
+            ++ apply H0, H1. 
+        -- apply IHHforall2.
+  + intros.
+    destruct H1 as [d [l [Hd_in [Hforall2 H_sum_distr]]]].
+    exists d, l.
+    split.
+    - apply H; auto.
+    - split.
+      2: auto.
+      clear H_sum_distr.
+      induction Hforall2.
+      * constructor.
+      * destruct y.
+        constructor.
+        -- split.
+            ++ apply H1.
+            ++ apply H0, H1. 
+        -- apply IHHforall2.
+Qed. 
   
 
 #[export] Instance ProbMonad_bind_mono_event (A: Type):
