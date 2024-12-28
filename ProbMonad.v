@@ -268,12 +268,84 @@ Proof.
         }
 Qed.
 
+Lemma filter_dup_in {A: Type}:
+  forall (l: list A),
+    forall x, In x (filter_dup l) -> In x l.
+Proof.
+  intros.
+  apply filter_dup_incl.
+  auto.
+Qed.
+
+Lemma filter_dup_in_inv {A: Type}:
+  forall (l: list A),
+    forall x, In x l -> In x (filter_dup l).
+Proof.
+  intros.
+  specialize (filter_dup_incl l x).
+  tauto.
+Qed.
+
+Lemma filter_dup_in_iff {A: Type}:
+  forall (l: list A),
+    forall x, In x l <-> In x (filter_dup l).
+Proof.
+  intros.
+  split; intros.
+  - apply filter_dup_in_inv.
+    auto.
+  - apply filter_dup_in.
+    auto.
+Qed.
+
+Lemma filter_dup_incl_list{A: Type}:
+  forall (lx l: list A),
+    incl lx l ->
+    incl lx (filter_dup l).
+Proof.
+  intros.
+  unfold incl in *.
+  intros.
+  apply filter_dup_in_inv.
+  apply H.
+  auto.
+Qed.
+
+Lemma filter_dup_incl_list_inv{A: Type}:
+  forall (lx l: list A),
+    incl lx (filter_dup l) ->
+    incl lx l.
+Proof.
+  intros.
+  unfold incl in *.
+  intros.
+  apply filter_dup_in.
+  apply H.
+  auto.
+Qed.
 
 Lemma perm_filter_dup_cons {A: Type}:
   forall (l l1 l2: list A),
     Permutation (filter_dup l1) (filter_dup l2) ->
     Permutation (filter_dup (l ++ l1)) (filter_dup (l ++ l2)).
 Admitted.
+
+Lemma perm_filter_dup_incl{A: Type}:
+  forall (l1 l2: list A),
+    (forall x, In x l1 <-> In x l2 ) ->
+              Permutation (filter_dup l1) (filter_dup l2).
+Proof.
+  (* Search (Permutation). *)
+  intros.
+  apply NoDup_Permutation.
+  - apply filter_dup_nodup.
+  - apply filter_dup_nodup.
+  - intros.
+    pose proof filter_dup_incl l1 x.
+    pose proof filter_dup_incl l2 x.
+    specialize (H x).
+    tauto.
+Qed.
 
 Lemma nodup_perm_filter_dup {A: Type}:
   forall (l: list A),
@@ -293,6 +365,247 @@ Proof.
   tauto.
 Qed.
 
+Lemma nodup_app_l {A: Type}:
+  forall (l1 l2: list A),
+    NoDup (l1 ++ l2) ->
+    NoDup l1.
+Admitted.
+
+Lemma nodup_app_r {A: Type}:
+  forall (l1 l2: list A),
+    NoDup (l1 ++ l2) ->
+    NoDup l2.
+Admitted.
+
+Lemma perm_nodup_app_l {A: Type}:
+  forall (l1 l2 l3: list A),
+    Permutation (l1 ++ l2) l3 ->
+    NoDup l3 ->
+    NoDup l1.
+Proof.
+  intros.
+  (* Search Permutation. *)
+  apply Permutation_sym in H.
+  pose proof Permutation_NoDup H H0.
+  (* Search (NoDup (_ ++ _)). *)
+  apply nodup_app_l in H1.
+  tauto.
+Qed.
+
+Lemma perm_nodup_app_r {A: Type}:
+  forall (l1 l2 l3: list A),
+    Permutation (l1 ++ l2) l3 ->
+    NoDup l3 ->
+    NoDup l2.
+Proof.
+  intros.
+  apply Permutation_sym in H.
+  pose proof Permutation_NoDup H H0.
+  apply nodup_app_r in H1.
+  tauto.
+Qed.
+
+Lemma in_listlist_concat_incl {A: Type}:
+  forall (l: list A) (ll: list (list A)),
+    In l ll ->
+    incl l (concat ll).
+Proof.
+  intros.
+  unfold incl.
+  intros.
+  apply in_concat.
+  exists l.
+  split; auto.
+Qed.
+
+Definition perm_after_map {A B: Type} (f: A -> B) (l1 l2: list A): Prop :=
+  Permutation (map f l1) (map f l2).
+
+#[export] Instance eq_perm_after_map {A B: Type} (f: A -> B):
+  Equivalence (@perm_after_map A B f).
+Proof.
+  unfold perm_after_map.
+  apply equiv_in_domain.
+  split.
+  - unfold Reflexive.
+    reflexivity.
+  - unfold Symmetric.
+    symmetry.
+    auto.
+  - unfold Transitive.
+    intros.
+    transitivity y.
+    all: auto.
+Qed.
+
+Lemma perm_after_map_perm {A B: Type}:
+  forall (f: A -> B) (l1 l2 l3 l4: list A),
+    Permutation l1 l2 ->
+    Permutation l3 l4 ->
+    perm_after_map f l1 l3 ->
+    perm_after_map f l2 l4.
+Proof.
+  intros.
+  unfold perm_after_map in *.
+  Search (Permutation).
+  pose proof Permutation_map f H as H2.
+  pose proof Permutation_map f H0 as H3.
+  rewrite <- H2.
+  rewrite <- H3.
+  auto.
+Qed.
+
+(* make the above into congr instance *)
+#[export] Instance perm_after_map_congr {A B: Type} (f: A -> B):
+  Proper (Permutation (A:=A) ==> Permutation (A:=A) ==> iff) (perm_after_map f).
+Proof.
+  unfold Proper, respectful.
+  intros.
+  split; intros.
+  - apply perm_after_map_perm with (l1 := x) (l3 := x0); auto.
+  - apply perm_after_map_perm with (l1 := y) (l3 := y0); auto.
+    all: symmetry; auto.
+Qed.
+
+Lemma Forall2_same_length {A B: Type}:
+  forall (P: A -> B -> Prop) l1 l2,
+    Forall2 P l1 l2 ->
+    length l1 = length l2.
+Proof.
+  intros.
+  induction H.
+  - reflexivity.
+  - simpl.
+    rewrite IHForall2.
+    reflexivity.
+Qed.
+
+Lemma Forall2_pair_Forall2_lt_length {A B1 B2: Type}:
+  forall n,
+  forall
+    (P1: A -> B1 -> Prop)
+    (P2: A -> B2 -> Prop)
+    (Q: B1 -> B2 -> Prop) 
+    la lb1 lb2,
+    length la < n ->
+    Forall2 P1 la lb1 ->
+    Forall2 P2 la lb2 ->
+    ( forall a b1 b2,
+      In a la ->
+      In b1 lb1 ->
+      In b2 lb2 ->
+      P1 a b1 ->
+      P2 a b2 ->
+      Q b1 b2 ) ->
+    Forall2 Q lb1 lb2.
+Proof.
+  assert (
+    forall n,
+    forall
+      (P1: A -> B1 -> Prop)
+      (P2: A -> B2 -> Prop)
+      (Q: B1 -> B2 -> Prop) 
+      la lb1 lb2,
+      length la <= n ->
+      Forall2 P1 la lb1 ->
+      Forall2 P2 la lb2 ->
+      ( forall a b1 b2,
+        In a la ->
+        In b1 lb1 ->
+        In b2 lb2 ->
+        P1 a b1 ->
+        P2 a b2 ->
+        Q b1 b2 ) ->
+      Forall2 Q lb1 lb2
+  ) as H_ind. {
+    induction n as [| n IH].
+    - intros.
+      inversion H.
+      pose proof length_zero_iff_nil la as [H_la_nil _]; specialize (H_la_nil H4).
+      pose proof Forall2_same_length _ _ _ H0.
+      pose proof Forall2_same_length _ _ _ H1.
+      subst; simpl in *.
+      assert (lb1 = []) by (apply length_zero_iff_nil; auto).
+      assert (lb2 = []) by (apply length_zero_iff_nil; auto).
+      subst; simpl in *.
+      constructor.
+    - intros.
+      inversion H0.
+      {
+        subst.
+        inversion H1.
+        subst.
+        constructor.
+      }
+      inversion H1.
+      {
+        subst.
+        inversion H7.
+      }
+      constructor.
+      {
+        apply H2 with (a := x).
+        all: auto.
+        all: subst; simpl in *; auto.
+        inversion H9.
+        rewrite <- H6.
+        auto.
+      }
+      remember l as la'; subst l.
+      remember l' as lb1'; subst l'.
+      remember l'0 as lb2'; subst l'0.
+      specialize (IH P1 P2 Q).
+      rewrite <- H5 in H9.
+      injection H9 as H9.
+      specialize (IH la' lb1' lb2').
+      assert (length la' <= n) as Hlength. {
+        subst la.
+        simpl in H.
+        lia.
+      }
+      apply IH; auto.
+      * subst.
+        auto.
+      * intros.
+        subst.
+        pose proof (H2 a b1 b2).
+        Search (In _ (_ :: _)).
+        pose proof in_cons x _ _ H12.
+        pose proof in_cons y _ _ H13.
+        pose proof in_cons y0 _ _ H14.
+        auto.
+  }
+  intros n.
+  intros.
+  assert (length la <= n) as Hlength. {
+    lia.
+  }
+  specialize (H_ind n P1 P2 Q la lb1 lb2 Hlength H0 H1 H2).
+  auto.
+Qed.
+
+Lemma Forall2_pair_Forall2 {A B: Type}:
+  forall (P: A -> B -> Prop) (Q: B -> B -> Prop) l la lb,
+    Forall2 P l la ->
+    Forall2 P l lb ->
+    ( forall a b1 b2,
+      In a l ->
+      In b1 la ->
+      In b2 lb ->
+      P a b1 ->
+      P a b2 ->
+      Q b1 b2 ) ->
+    Forall2 Q la lb.
+
+Proof.
+  intros P Q l.
+  pose proof Forall2_pair_Forall2_lt_length (S (length l)) P P Q l.
+  intros.
+  assert (length l < S (length l)) by lia.
+  eapply H.
+  all: auto.
+Qed.
+
 (*********************************************************)
 (**                                                      *)
 (** Probability Distribution                             *)
@@ -304,6 +617,19 @@ Definition sum (l: list R): R :=
 
 Definition sum_prob {A: Type} (pset: list A) (prob: A -> R): R :=
   sum (map prob pset).
+
+Lemma sum_app:
+  forall (l1 l2: list R),
+    sum (l1 ++ l2) = (sum l1 + sum l2)%R.
+Proof.
+  intros.
+  induction l1.
+  - simpl.
+    lra.
+  - simpl.
+    rewrite IHl1.
+    lra.
+Qed.
 
 Module ProbDistr.
 
@@ -382,6 +708,65 @@ Notation "x '.(legal_prob_1)'" := (ProbDistr.legal_prob_1 _ x) (at level 1).
 
 (* Lemmas *)
 
+Lemma incl_nodup_perm:
+  forall {A: Type} (l1 l2: list A),
+    NoDup l1 ->
+    NoDup l2 ->
+    incl l1 l2 ->
+    incl l2 l1 ->
+    Permutation l1 l2.
+Proof.
+  intros.
+  apply NoDup_Permutation; auto.
+  intros.
+  unfold incl in *.
+  split; intros.
+  - auto.
+  - auto.
+Qed.
+
+Lemma list_partition_in_notin:
+  forall {A: Type} (l t: list A),
+    exists t1 t2,
+      Permutation (t1 ++ t2) t /\
+      (forall a, In a t1 -> In a l) /\
+      (forall a, In a t2 -> ~ In a l).
+Proof.
+  intros.
+  exists (filter (fun a => if in_dec eq_dec a l then true else false) t),
+         (filter (fun a => if in_dec eq_dec a l then false else true) t).
+  split.
+  - induction t.
+    + simpl.
+      reflexivity.
+    + simpl.
+      destruct (in_dec eq_dec a l).
+      * simpl.
+        rewrite IHt.
+        reflexivity.
+      * simpl.
+        (* Search (Permutation (_ ++ _)). *)
+        rewrite Permutation_app_comm.
+        simpl.
+        apply Permutation_cons; [reflexivity | auto].
+        rewrite Permutation_app_comm.
+        apply IHt.
+  - split; intros.
+    + apply filter_In in H.
+      destruct H.
+      destruct (in_dec eq_dec a l).
+      * auto.
+      * inversion H0.
+    + apply filter_In in H.
+      destruct H.
+      destruct (in_dec eq_dec a l).
+      * inversion H0.
+      * auto.
+Qed.
+
+
+
+
 #[export] Instance sum_congr :
   Proper (Permutation (A:=R) ==> eq) (sum).
 Proof.
@@ -417,19 +802,122 @@ Proof.
   - apply Permutation_trans with (l' := map f l'); assumption.
 Qed.
 
+Definition eq_fun {A B: Type} (f1 f2: A -> B): Prop :=
+  forall a, f1 a = f2 a.
+
 #[export] Instance sum_prob_congr {A: Type}:
-  Proper (Permutation (A:=A) ==> eq ==> eq) (@sum_prob A).
+  Proper (Permutation (A:=A) ==> eq_fun ==> eq) (@sum_prob A).
 Proof.
   unfold Proper, respectful.
   intros l1 l2 Hl r1 r2 ?.
-  subst r2.
+  unfold eq_fun in H.
   unfold sum_prob.
-  enough (Permutation (map r1 l1) (map r1 l2)). {
-    apply sum_congr.
+  rewrite Hl. 
+  apply sum_congr.
+  induction Hl.
+  - reflexivity.
+  - simpl.
+    rewrite H.
+    (* Search Permutation. *)
+    apply perm_skip.
     assumption.
+  - simpl.
+    repeat rewrite H.
+    apply perm_skip.
+    apply perm_skip.
+    induction l.
+    + constructor.
+    + simpl.
+      rewrite H.
+      apply perm_skip.
+      assumption.
+  - assumption.
+Qed.
+
+Lemma sum_prob_cover_pset_1:
+  forall {A: Type} (d: Distr A),
+    ProbDistr.legal d ->
+    forall (l: list A),
+      NoDup l ->
+      incl d.(pset) l ->
+      sum_prob l d.(prob) = 1%R.
+Proof.
+  intros.
+  unfold sum_prob.
+  destruct H.
+  pose proof list_partition_in_notin d.(pset) l as H.
+  destruct H as [t1 [t2 [? [? ?]]]].
+  rewrite <- H.
+  (* Search (map _ (_ ++ _)). *)
+  rewrite map_app.
+  rewrite sum_app.
+  enough (
+    sum (map d.(prob) t1) = 1%R
+    /\
+    sum (map d.(prob) t2) = 0%R
+  ). {
+    destruct H4.
+    lra.
   }
-  apply perm_map.
-  assumption.
+  split.
+  {
+    enough (
+      Permutation t1 d.(pset)
+    ). {
+      rewrite H4.
+      assumption.
+    }
+    apply incl_nodup_perm; unfold incl.
+    pose proof perm_nodup_app_l _ _ _ H H0.
+    auto.
+    auto.
+    apply H2.
+    intros.
+    (* Search (In _( _++_)). *)
+    destruct (in_app_or t1 t2 a) as [Hint1 | Hint2].
+    - rewrite H.
+      apply H1.
+      auto.
+    - assumption.
+    - pose proof H3 _ Hint2.
+      contradiction.
+  }
+  {
+    assert (
+      forall a: A, In a t2 -> (d.(prob) a <= 0)%R
+    ). {
+      intros.
+      apply H3 in H4.
+      pose proof legal_pset_valid a.
+      pose proof imply_to_or _ _ H5.
+      assert (~ (d.(prob) a > 0)%R) by tauto.
+      lra.
+    }
+    assert (
+      forall a: A, In a t2 -> d.(prob) a = 0%R
+    ). {
+      intros.
+      apply Rle_antisym.
+      apply H4; auto.
+      apply Rge_le.
+      apply legal_nonneg.
+    }
+    clear H H2 H3 H4.
+    induction t2.
+    - simpl.
+      reflexivity.
+    - simpl.
+      simpl in H5.
+      assert (forall a : A, In a t2 -> d.(prob) a = 0%R). {
+        intros.
+        apply H5.
+        right.
+        auto.
+      }
+      specialize (IHt2 H).
+      rewrite IHt2.
+      rewrite H5; try lra; auto.
+  }
 Qed.
 
 Theorem ProbDistr_compute_pr_exists: forall d, exists r,
@@ -552,6 +1040,8 @@ Proof.
   enough (Permutation l1 l2). {
     subst.
     apply sum_prob_congr; auto.
+    unfold eq_fun.
+    reflexivity.
   }
   apply NoDup_Permutation; auto.
   intros P.
@@ -918,6 +1408,160 @@ Proof.
     + right. apply H. auto.
 Qed.
 
+Lemma Forall2_in_r_exists:
+  forall {A B: Type} (l1: list A) (l2: list B) (f: A -> B -> Prop),
+    Forall2 f l1 l2 ->
+    forall b, In b l2 -> exists a, In a l1 /\ f a b.
+Proof.
+  intros.
+  induction H.
+  - inversion H0.
+  - destruct H0.
+    + subst.
+      exists x.
+      split; auto.
+      left; auto.
+    + apply IHForall2 in H0.
+      destruct H0 as [a [? ?]].
+      exists a.
+      split; auto.
+      right; auto.
+Qed.
+
+Lemma Forall2_in_l_exists:
+  forall {A B: Type} (l1: list A) (l2: list B) (f: A -> B -> Prop),
+    Forall2 f l1 l2 ->
+    forall a, In a l1 -> exists b, In b l2 /\ f a b.
+Proof.
+  intros.
+  induction H.
+  - inversion H0.
+  - destruct H0.
+    + subst.
+      exists y.
+      split; auto.
+      left; auto.
+    + apply IHForall2 in H0.
+      destruct H0 as [b [? ?]].
+      exists b.
+      split; auto.
+      right; auto.
+Qed.
+
+
+Lemma Rge_ne_gt:
+  forall r1 r2,
+    (r1 >= r2)%R ->
+    r1 <> r2 ->
+    (r1 > r2)%R.
+Proof.
+  intros.
+  destruct (Rgt_ge_dec r1 r2).
+  - auto.
+  - pose proof Rge_le r1 r2 H.
+    pose proof Rge_antisym _ _ H r.
+    contradiction.
+Qed.
+
+Lemma sum_map_add:
+  forall {A: Type},
+  forall (l: list A),
+    forall (f f1 f2: A -> R),
+    (forall a, f a = f1 a + f2 a)%R ->
+    (sum (map f l) = sum (map f1 l) + sum (map f2 l))%R.
+Proof.
+  intros.
+  induction l.
+  - simpl.
+    rewrite Rplus_0_r.
+    reflexivity.
+  - simpl.
+    rewrite IHl.
+    rewrite H.
+    lra.
+Qed.
+
+Lemma sum_map_sum_map:
+  forall (A B: Type) (la: list A) (lb: list B) (g: B -> A -> R),
+    sum (
+      map (fun a => 
+                sum (
+                  map (fun b => (g b) a) 
+                  lb)
+          )
+      la
+    )
+    =
+    sum (
+      map (fun b =>
+                sum (
+                  map (fun a => (g b) a) 
+                  la)
+          )
+      lb
+    ).
+Proof.
+  intros.
+  induction la as [| a la IHa], lb as [| b lb].
+  - simpl.
+    reflexivity.
+  - simpl.
+    enough (sum (map (fun _ : B => 0) lb) = 0)%R.
+    {
+      rewrite H.
+      rewrite Rplus_0_r; reflexivity.
+    }
+    induction lb.
+    + simpl; reflexivity.
+    + simpl; rewrite IHlb; rewrite Rplus_0_r; reflexivity.
+  - simpl.
+    enough (sum (map (fun _ : A => 0) la) = 0)%R.
+    {
+      rewrite H.
+      rewrite Rplus_0_r; reflexivity.
+    }
+    simpl in IHa.
+    assumption.
+  - simpl in *.
+
+    (* Search (?x + _ = ?x + _)%R. *)
+    (* SearchRewrite ((_ + _)+_)%R. *)
+    rewrite Rplus_assoc.
+    rewrite Rplus_assoc.
+    apply Rplus_eq_compat_l.
+    rewrite IHa.
+    rewrite Rplus_comm.
+    rewrite Rplus_assoc.
+    apply Rplus_eq_compat_l.
+    pose proof sum_map_add lb.
+    assert (
+      forall b: B,
+      (fun b0 : B => (g b0 a + sum (map (fun a0 : A => g b0 a0) la))%R) b =
+      (fun b0 : B => (sum (map (fun a0 : A => g b0 a0) la))%R) b
+      +
+      (fun b0 : B => (g b0 a)%R) b
+    )%R. {
+      intros.
+      lra.
+    }
+    specialize (H _ _ _ H0).
+    rewrite H.
+    reflexivity.
+Qed.
+
+Lemma sum_map_multi:
+  forall {A: Type} (l: list A) (f: A -> R) (r: R),
+    sum (map (fun a => r * f a) l)%R = (r * sum (map f l))%R.
+Proof.
+  intros.
+  induction l.
+  - simpl.
+    lra.
+  - simpl.
+    rewrite IHl.
+    lra.
+Qed.
+
 Lemma __bind_legal {A B: Type}:
   forall (f: Distr A -> Prop) (g: A -> Distr B -> Prop),
     Legal f ->
@@ -1006,17 +1650,282 @@ Proof.
     intros d H_d_is_bind_f_g.
     unfold __bind in H_d_is_bind_f_g.
     destruct H_d_is_bind_f_g as [da [l [H_da_in_f [H_forall2 H_sum_distr]]]].
+    destruct H_sum_distr as [H_sum_pset_valid H_sum_prob_valid].
     split.
-    (* TODO *)
-    assert 
-    (Forall2 (fun (a : A) '(r, d') => r = da.(prob) a /\ d' ∈ g a) da.(pset) l)
-    as H_forall2'. {
-      apply H_forall2.
-    }
-  }
-(* Admitted. *)
+    - pose proof perm_filter_dup_nodup _ _ H_sum_pset_valid.
+      assumption.
+    - intros b.
+      specialize (H_sum_prob_valid b).
+      rewrite H_sum_prob_valid.
+      enough (
+        forall '(r, d), In (r, d) l ->
+          (r * d.(prob) b >= 0)%R
+      ). {
+        clear H_forall2.
+        clear H_sum_pset_valid.
+        clear H_sum_prob_valid.
+        induction l as [| [ri di] l IH].
+        - unfold sum, map.
+          simpl.
+          apply Rle_refl.
+        - simpl in H.
+          assert (
+            (forall '(r, d), (ri, di) = (r, d)  -> (r * d.(prob) b >= 0)%R)
+            /\
+            (forall '(r, d), In (r, d) l -> (r * d.(prob) b >= 0)%R)
 
-
+          ). {
+            split.
+            - intros [r1 d1].
+              specialize (H (r1, d1)).
+              intros.
+              apply H.
+              auto.
+            - intros [r1 d1] H_in_l.
+              specialize (H (r1, d1)).
+              intros.
+              apply H.
+              right.
+              auto. 
+          }
+          destruct H0 as [H0_1 H0_2].
+          specialize (IH H0_2).
+          unfold sum.
+          simpl.
+          enough (
+            (ri * di.(prob) b >= 0)%R
+            /\
+            (fold_right Rplus 0 (map (fun '(r, d0) => r * d0.(prob) b) l) >= 0)%R
+          ) as H1. {
+            destruct H1.
+            (* Search (_ >= _ -> _ >= _ -> _ >= _)%R. *)
+            pose proof Rplus_ge_compat _ _ _ _ H0 H1.
+            (* Search (0 + _)%R. *)
+            rewrite Rplus_0_l in H2.
+            auto.
+          }
+          split.
+          + specialize (H0_1 (ri, di)).
+            apply H0_1.
+            auto.
+          + exact IH.
+      }
+      intros [r db] H_in_l.
+      clear H_sum_pset_valid H_sum_prob_valid.
+      (* Search (Forall2). *)
+      induction H_forall2.
+      * inversion H_in_l.
+      * destruct H_in_l.
+        {
+          subst.
+          destruct H as [H_prob_eq H_db_in_g].
+          destruct H_legal_f as [_ H_legal_f _].
+          pose proof (H_legal_f da H_da_in_f) as legal_da.
+          destruct legal_da as [_ H_nonneg_da _ _].
+          pose proof H_nonneg_da x as r_nonneg.
+          rewrite <- H_prob_eq in r_nonneg.
+          clear H_nonneg_da H_prob_eq.
+          specialize (H_all_legal_g x).
+          destruct H_all_legal_g as [_ H_legal_g_x _].
+          pose proof H_legal_g_x db H_db_in_g as legal_db.
+          destruct legal_db as [_ H_nonneg_db _ _].
+          pose proof H_nonneg_db b as nonneg_db.
+          (* Search (_ * _ >= _)%R. *)
+          assert (forall x y, (x >= 0)%R -> (y >= 0)%R -> (x * y >= 0)%R) as Rmult_ge_0. {
+            intros.
+            pose proof Rmult_ge_compat_l x0 y 0 H H0.
+            rewrite Rmult_0_r in H1.
+            auto.
+          }
+          apply Rmult_ge_0; auto.
+        }
+        {
+          apply IHH_forall2.
+          auto.
+        }
+    - intros b.
+      specialize (H_sum_prob_valid b).
+      rewrite H_sum_prob_valid.
+      intros H.
+      assert (
+        exists '(r, d), In (r, d) l /\ (r * d.(prob) b > 0)%R
+      ). {
+        clear H_sum_prob_valid.
+        clear H_sum_pset_valid.
+        clear H_forall2.
+        induction l as [| [ri di] l IH].
+        - simpl in H.
+          pose proof Rgt_irrefl 0%R.
+          contradiction.
+        - simpl in H.
+          (* H: (_ + _)>0. so either of them should be > 0. *)
+          destruct (Rgt_dec (ri * di.(prob) b) 0%R) as [H_pos | H_nonpos].
+          + exists (ri, di).
+            simpl; auto.
+          + 
+            (* Search (~ (_ > _)%R -> _ <= _)%R. *)
+            pose proof Rnot_gt_le _ _ H_nonpos.
+            (* Search (_ >= _)%R. *)
+            rewrite Rplus_comm in H.
+            pose proof Rle_ge _ _ H0.
+            pose proof Rplus_gt_reg_neg_r _ _ _ H1 H.
+            specialize (IH H2).
+            destruct IH as [[rii dii] [H_in_l H_pos]].
+            exists (rii, dii).
+            simpl; auto.
+      }
+      destruct H0 as [[ri di] [H_in_l H_pos]].
+      (* Search (Permutation _ _ -> In _ _ -> In _ _). *)
+      apply Permutation_in with (l := (filter_dup (concat (map (fun '(_, d) => d.(pset)) l)))).
+      + 
+        apply Permutation_sym.
+        assumption.
+      +
+        apply filter_dup_in_inv.
+        apply in_concat.
+        exists (di.(pset)).
+        split.
+        * clear H_sum_prob_valid H_sum_pset_valid H_forall2 H.
+          induction l as [| [rii dii] l IH].
+          -- simpl in H_in_l.
+             contradiction.
+          -- simpl in H_in_l.
+             destruct H_in_l.
+             ++ inversion H.
+                subst.
+                simpl.
+                left.
+                auto.
+              ++ right.
+                apply IH.
+                auto.
+        * 
+          (* prove that ri>0 and di is legal *)
+          (* Search Forall2. *)
+          pose proof Forall2_in_r_exists _ _ _ H_forall2 _ H_in_l as [a [H_a_in_apset [H_prob_eq H_ga_in_g]]].
+          pose proof H_all_legal_g a as [_ H_all_ga_legal _].
+          pose proof H_all_ga_legal _ H_ga_in_g as [_ H_ga_nonneg H_ga_pset_valid _].
+          apply H_ga_pset_valid.
+          destruct (eq_dec (di.(prob) b) 0%R) as [H_eq | H_neq].
+          --
+            subst.
+            rewrite H_eq in H_pos.
+            (* Search (_ * 0)%R. *)
+            rewrite Rmult_0_r in H_pos.
+            pose proof Rgt_irrefl 0%R.
+            contradiction.
+          --
+            specialize (H_ga_nonneg b).
+            apply Rge_ne_gt; auto.
+    -
+      pose proof sum_prob_congr _ _ H_sum_pset_valid _ _ H_sum_prob_valid as H_sum_prob_valid_2.
+      rewrite H_sum_prob_valid_2.
+      clear H_sum_prob_valid_2.
+      clear H_sum_pset_valid.
+      clear H_sum_prob_valid.
+      unfold sum_prob.
+      pose proof sum_map_sum_map _ _ (filter_dup (concat (map (fun '(_, d0) => d0.(pset)) l))) l.
+      specialize (H
+        (
+          fun '(r, d0) => 
+            fun b: B => 
+              (r * d0.(prob) b)%R
+        )
+      ).
+      simpl in H.
+      assert (
+        sum
+          (map
+            (fun a : B =>
+              sum
+                (map
+                  (fun b : R * Distr B =>
+                    (let '(r, d0) := b in fun b0 : B => (r * d0.(prob) b0)%R) a) l))
+            (filter_dup (concat (map (fun '(_, d0) => d0.(pset)) l))))
+      =
+      sum
+        (map (fun a : B => sum (map (fun '(r, d0) => (r * d0.(prob) a)%R) l))
+          (filter_dup (concat (map (fun '(_, d0) => d0.(pset)) l))))
+      ) as H_eq. {
+        f_equal.
+        f_equal.
+        extensionality a.
+        f_equal.
+        f_equal.
+        extensionality b.
+        destruct b as [r d0].
+        reflexivity.
+      }
+      rewrite <- H_eq.
+      clear H_eq.
+      rewrite H.
+      clear H.
+      enough (
+        (map
+          (fun b : R * Distr B =>
+            sum
+              (map
+                (fun a : B => (let '(r, d0) := b in fun b0 : B => (r * d0.(prob) b0)%R) a)
+                (filter_dup (concat (map (fun '(_, d0) => d0.(pset)) l))))) l)
+        =
+        map fst l
+      ). {
+        rewrite H.
+        clear H.
+        enough (
+          map fst l
+          =
+          map da.(prob) da.(pset)
+        ). {
+          rewrite H.
+          clear H.
+          destruct H_legal_f as [_ H_f_legal _].
+          specialize (H_f_legal da H_da_in_f).
+          destruct H_f_legal as [_ _ _ prob1].
+          apply prob1.
+        }
+        induction H_forall2.
+        - simpl.
+          reflexivity.
+        - simpl.
+          rewrite IHH_forall2.
+          destruct y.
+          destruct H.
+          simpl.
+          subst.
+          reflexivity.
+      }
+      (* Search map. *)
+      apply map_ext_in.
+      intros [r d0] H_in_l.
+      simpl.
+      (* Search Forall2. *)
+      pose proof Forall2_in_r_exists _ _ _ H_forall2 _ H_in_l as [a [H_a_in_apset [H_prob_eq H_ga_in_g]]].
+      pose proof H_all_legal_g a as [_ H_all_ga_legal _].
+      pose proof H_all_ga_legal _ H_ga_in_g as [H_ga_pset_valid H_ga_nonneg H_ga_legal H_ga_prob_1].
+      pose proof sum_map_multi (filter_dup (concat (map (fun '(_, d1) => d1.(pset)) l))) d0.(prob) r.
+      rewrite H.
+      clear H.
+      enough (
+        sum (map d0.(prob) (filter_dup (concat (map (fun '(_, d1) => d1.(pset)) l))))%R = 1%R
+      ). {
+        rewrite H.
+        lra.
+      }
+      apply sum_prob_cover_pset_1; auto.
+      * apply filter_dup_nodup.
+      * apply filter_dup_incl_list.
+        assert (
+          In d0.(pset)
+          (map (fun '(_, d1) => d1.(pset)) l)
+        ). {
+          pose proof in_map (fun '(_, d1) => d1.(pset)) l (r, d0) H_in_l.
+          simpl in H.
+          auto.
+        }
+        apply in_listlist_concat_incl.
+        auto.
+  }  (* Legal finished *)
   {
     sets_unfold.
     intros d1 d2 H_d1_is_bind_f_g H_d2_is_bind_f_g.
@@ -1038,10 +1947,216 @@ Proof.
         apply sum_congr.
         assumption.
       }
+      (* Search Forall2. *)
+      (* enough (
+        exists l3,
+          Permutation (map (fun '(r, d) => (r * d.(prob) b)%R) l1) l3 /\
+          Permutation (map (fun '(r, d) => (r * d.(prob) b)%R) l2) l3
+      ). {
+        destruct H as [l3 [H_perm_1 H_perm_2]].
+        rewrite H_perm_1.
+        rewrite H_perm_2.
+        reflexivity.
+      } *)
 
+      assert (
+        forall l1 l2,
+          forall perm1 perm2,
+            Permutation da1.(pset) perm1 ->
+            Permutation da1.(pset) perm2 ->
+            Forall2 (fun (a : A) '(r, d) => r = da1.(prob) a /\ d ∈ g a) perm1 l1 ->
+            Forall2 (fun (a : A) '(r, d) => r = da1.(prob) a /\ d ∈ g a)
+            perm2 l2 ->
+            perm_after_map (fun '(r, d) => (r * d.(prob) b)%R) l1 l2
+      ). {
+        clear l1 l2 H_forall2_1 H_forall2_2.
+        clear d1 d2 da2 H_prob_equiv_da12 H_pset_perm_da12 H_da2_in_f.
+        intros.
+        sets_unfold in H1.
+        sets_unfold in H2.
+        (* Search Forall2. *)
+
+        symmetry in H.
+        pose proof Permutation_trans as H_perm.
+        specialize (H_perm _ _ _ _ H H0).
+        pose proof Permutation_Forall2 as H_perm_forall2.
+        specialize (H_perm_forall2 _ _ _ _ _ _ H_perm H1).
+        destruct H_perm_forall2 as [l1' [H_perm_l1_l1' H1']].
+        clear H1.
+        rewrite H_perm_l1_l1'.
+        clear H_perm_l1_l1' l1.
+        remember l1' as l1; subst l1'.
+        clear perm1 H H_perm.
+        remember perm2 as perm; subst perm2.
+        symmetry in H0.
+        pose proof Permutation_Forall2 H0 H2 as [l2'' [H_perm_l2_l2'' H2']]. 
+        pose proof Permutation_Forall2 H0 H1' as [l1'' [H_perm_l1_l1'' H1'']].
+        rewrite H_perm_l2_l2'', H_perm_l1_l1''.
+        clear l1 l2 H_perm_l2_l2'' H_perm_l1_l1'' H2 H1'.
+        clear H0 perm.
+        remember H1'' as H1; clear H1'' HeqH1.
+        remember H2' as H2; clear H2' HeqH2.
+        remember l1'' as l1; subst l1''.
+        remember l2'' as l2; subst l2''.
+
+        unfold perm_after_map.
+        (* now the order are aligned *)
+        enough (
+          (map (fun '(r, d) => (r * d.(prob) b)%R) l1)
+          =
+          (map (fun '(r, d) => (r * d.(prob) b)%R) l2)
+        ). {
+          rewrite H.
+          reflexivity.
+        }
+        (* Search map. *)
+        remember (fun (a : A) '(r, d) => r = da1.(prob) a /\ g a d) as pred.
+        remember (fun '(r, d) => (r * d.(prob) b)%R) as cal.
+        assert (
+          forall a t1 t2,
+          In a da1.(pset) ->
+          In t1 l1 ->
+          In t2 l2 ->
+          pred a t1 ->
+          pred a t2 ->
+          cal t1 = cal t2
+        ). {
+          intros.
+          subst pred.
+          subst cal.
+          destruct t1 as [r1 d1], t2 as [r2 d2].
+          destruct H5.
+          destruct H4.
+          enough (
+           (r1=r2)%R /\ (d1.(prob) b = d2.(prob) b)%R
+          ) as HH. {
+            destruct HH as [HH1 HH2].
+            rewrite HH1, HH2.
+            reflexivity.
+          }
+          split.
+          - lra.
+          - pose proof H_all_legal_g a as [_ _ H_all_ga_unique].
+            specialize (H_all_ga_unique _ _ H7 H6).
+            destruct H_all_ga_unique as [H_prob_eq H_ga_unique].
+            apply H_prob_eq.
+        }
+        enough (
+          Forall2 (fun x1 x2 => cal x1 = cal x2) l1 l2
+        ) as H_forall2. {
+          clear H1 H2 H.
+          induction H_forall2.
+          - constructor.
+          - simpl.
+            rewrite H, IHH_forall2.
+            reflexivity.
+        }
+        pose proof Forall2_pair_Forall2 pred (fun x1 x2 : R * Distr B => cal x1 = cal x2) da1.(pset) l1 l2.
+        eapply H0.
+        all: auto.
+      }
+      assert (da1.(prob) = da2.(prob)) as H_prob_eq. {
+        exact (functional_extensionality da1.(prob) da2.(prob) H_prob_equiv_da12).
+      }
+      assert (Permutation da1.(pset) da1.(pset)) as H_perm by auto.
+      rewrite <- H_prob_eq in H_forall2_2.
+      specialize (H _ _ _ _ H_perm H_pset_perm_da12 H_forall2_1 H_forall2_2).
+      exact H.
+    }
+    {
+      destruct H_sum_distr_1 as [H_sum_pset_valid_1 _].
+      destruct H_sum_distr_2 as [H_sum_pset_valid_2 _].
+      rewrite H_sum_pset_valid_1, H_sum_pset_valid_2.
+      clear H_sum_pset_valid_1 H_sum_pset_valid_2.
+      (* Search filter_dup. *)
+      apply perm_filter_dup_incl.
+      intros b.
+      split.
+      {
+        intros H.
+        pose proof in_concat (map (fun '(_, d) => d.(pset)) l1) b as [H_inb _]; specialize (H_inb H).
+        destruct H_inb as [lb [H_lb H_inb]].
+        Search map.
+        pose proof in_map_iff (fun '(_, d) => d.(pset)) l1 lb as [H_lb_in_l1 _]; specialize (H_lb_in_l1 H_lb).
+        destruct H_lb_in_l1 as [db [H_db_eq H_db_in_l1]].
+        pose proof Forall2_in_r_exists _ _ _ H_forall2_1 _ H_db_in_l1.
+        destruct H0 as [a [? ?]].
+
+        assert (Permutation da1.(pset) da2.(pset)) as H_perm. {
+          destruct H_legal_f as [_ _ H_unique_f].
+          specialize (H_unique_f da1 da2 H_da1_in_f H_da2_in_f).
+          destruct H_unique_f as [? ?].
+          auto.
+        }
+        assert (In a da2.(pset)) as H_in_a2. {
+          apply Permutation_in with (l := da1.(pset)); auto.
+        }
+        pose proof Forall2_in_l_exists _ _ _ H_forall2_2 _ H_in_a2 as [b2 [? ?]].
+        destruct db.
+        destruct b2.
+        subst.
+        apply in_concat.
+        exists (d0.(pset)).
+        split; auto.
+        {
+          apply in_map_iff.
+          exists (r0, d0).
+          split; auto.
+        }
+        {
+          destruct H1, H3.
+          (* d and d0 all ∈ g a *)
+          pose proof H_all_legal_g a as [_ _ H_all_ga_legal].
+          specialize (H_all_ga_legal _ _ H4 H5).
+          destruct H_all_ga_legal as [_ Hperm].
+          pose proof Permutation_in _ Hperm H_inb.
+          auto.
+        }
+      }
+      {
+        intros H.
+        pose proof in_concat (map (fun '(_, d) => d.(pset)) l2) b as [H_inb _]; specialize (H_inb H).
+        destruct H_inb as [lb [H_lb H_inb]].
+        pose proof in_map_iff (fun '(_, d) => d.(pset)) l2 lb as [H_lb_in_l2 _]; specialize (H_lb_in_l2 H_lb).
+        destruct H_lb_in_l2 as [db [H_db_eq H_db_in_l2]].
+        pose proof Forall2_in_r_exists _ _ _ H_forall2_2 _ H_db_in_l2.
+        destruct H0 as [a [? ?]].
+
+        assert (Permutation da1.(pset) da2.(pset)) as H_perm. {
+          destruct H_legal_f as [_ _ H_unique_f].
+          specialize (H_unique_f da1 da2 H_da1_in_f H_da2_in_f).
+          destruct H_unique_f as [? ?].
+          auto.
+        }
+        assert (In a da1.(pset)) as H_in_a1. {
+          apply Permutation_in with (l := da2.(pset)); auto.
+          symmetry; auto.
+        }
+        pose proof Forall2_in_l_exists _ _ _ H_forall2_1 _ H_in_a1 as [b1 [? ?]].
+        destruct db.
+        destruct b1.
+        subst.
+        apply in_concat.
+        exists (d0.(pset)).
+        split; auto.
+        {
+          apply in_map_iff.
+          exists (r0, d0).
+          split; auto.
+        }
+        {
+          destruct H1, H3.
+          (* d and d0 all ∈ g a *)
+          pose proof H_all_legal_g a as [_ _ H_all_ga_legal].
+          specialize (H_all_ga_legal _ _ H4 H5).
+          destruct H_all_ga_legal as [_ Hperm].
+          pose proof Permutation_in _ Hperm H_inb.
+          auto.
+        }
+      }
     }
   }
-Admitted.
+Qed.
 
 
 Definition bind {A B: Type} (f: M A) (g: A -> M B): M B :=
