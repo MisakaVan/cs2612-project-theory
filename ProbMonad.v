@@ -447,7 +447,7 @@ Lemma perm_after_map_perm {A B: Type}:
 Proof.
   intros.
   unfold perm_after_map in *.
-  Search (Permutation).
+  (* Search (Permutation). *)
   pose proof Permutation_map f H as H2.
   pose proof Permutation_map f H0 as H3.
   rewrite <- H2.
@@ -569,7 +569,7 @@ Proof.
       * intros.
         subst.
         pose proof (H2 a b1 b2).
-        Search (In _ (_ :: _)).
+        (* Search (In _ (_ :: _)). *)
         pose proof in_cons x _ _ H12.
         pose proof in_cons y _ _ H13.
         pose proof in_cons y0 _ _ H14.
@@ -2076,7 +2076,7 @@ Proof.
         intros H.
         pose proof in_concat (map (fun '(_, d) => d.(pset)) l1) b as [H_inb _]; specialize (H_inb H).
         destruct H_inb as [lb [H_lb H_inb]].
-        Search map.
+        (* Search map. *)
         pose proof in_map_iff (fun '(_, d) => d.(pset)) l1 lb as [H_lb_in_l1 _]; specialize (H_lb_in_l1 H_lb).
         destruct H_lb_in_l1 as [db [H_db_eq H_db_in_l1]].
         pose proof Forall2_in_r_exists _ _ _ H_forall2_1 _ H_db_in_l1.
