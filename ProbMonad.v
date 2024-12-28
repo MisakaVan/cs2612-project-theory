@@ -33,6 +33,46 @@ Proof.
     transitivity (f y); tauto.
 Qed.
 
+Lemma Forall2_to_forall_r:
+  forall {A B: Type} (l1: list A) (l2: list B) (f: A -> B -> Prop),
+    Forall2 f l1 l2 ->
+    (forall b, In b l2 -> exists a, In a l1 /\ f a b).
+Proof.
+  intros.
+  induction H.
+  - inversion H0.
+  - destruct H0.
+    + subst.
+      exists x.
+      split; auto.
+      left; auto.
+    + apply IHForall2 in H0.
+      destruct H0 as [a [? ?]].
+      exists a.
+      split; auto.
+      right; auto.
+Qed.
+
+Lemma Forall2_to_forall_l:
+  forall {A B: Type} (l1: list A) (l2: list B) (f: A -> B -> Prop),
+    Forall2 f l1 l2 ->
+    (forall a, In a l1 -> exists b, In b l2 /\ f a b).
+Proof.
+  intros.
+  induction H.
+  - inversion H0.
+  - destruct H0.
+    + subst.
+      exists y.
+      split; auto.
+      left; auto.
+    + apply IHForall2 in H0.
+      destruct H0 as [b [? ?]].
+      exists b.
+      split; auto.
+      right; auto.
+Qed.
+
 (*********************************************************)
 (**                                                      *)
 (** General Definition of Monad                          *)
@@ -2197,6 +2237,18 @@ Notation "x '.(Legal_unique)'" := (ProbMonad.Legal_unique _ x) (at level 1).
 Definition Always {A: Type} (c: ProbMonad.M A) (P: A -> Prop): Prop :=
   Hoare (ProbMonad.compute_pr (res <- c;; ret (P res))) (fun pr => pr = 1%R).
 
+Lemma Forall2_to_forall:
+  forall {A B: Type} (l1: list A) (l2: list B) (f: A -> B -> Prop),
+    Forall2 f l1 l2 ->
+    Forall (fun '(a, b) => f a b) (combine l1 l2).
+Proof.
+  intros.
+  induction H.
+  - constructor.
+  - simpl.
+    constructor; auto.
+Qed.
+
 Theorem Always_conseq: forall {A: Type} (P Q: A -> Prop),
   (forall a, P a -> Q a) ->
   (forall c, Always c Q -> Always c P).
@@ -2501,7 +2553,23 @@ Qed.
           pointwise_relation _ ProbMonad.equiv ==>
           ProbMonad.equiv)
     (@bind _ ProbMonad A B).
-Admitted. (** Level 2 *)
+Proof. (** Level 2 *)    
+  unfold Proper, pointwise_relation, respectful.
+  unfold ProbMonad.equiv in *.
+  sets_unfold.
+  simpl.
+  intros x y H f g H0.
+  unfold ProbMonad.__bind.
+  split.
+  + intros.
+    destruct H1 as [dx [dy [Hdx [Hdy H_imp]]]].
+    exists dx, dy.
+    repeat split; auto.
+    - apply H.
+      auto.
+    -
+Admitted. 
+  
 
 #[export] Instance ProbMonad_bind_mono_event (A: Type):
   Proper (ProbMonad.equiv ==>
@@ -2517,9 +2585,248 @@ Admitted. (** Level 2 *)
     (@bind _ ProbMonad A Prop).
 Admitted. (** Level 2 *)
 
+Lemma list_eq_nil:
+  forall (A : Type) (l : list A),
+    (forall x, In x l -> False) ->
+    l = [].
+Proof.
+  intros A l H.
+  destruct l as [|x xs].
+  - reflexivity.
+  - simpl in H. exfalso. specialize (H x).
+    apply H. left. reflexivity.
+Qed.
+
+Lemma one_element_list:
+  forall {A: Type} {l: list A} {a},
+    In a l -> (forall b, b <> a -> ~ In b l) -> NoDup l -> l = [a].
+Proof.
+  intros A l a H_in H_unique H_nodup.
+  induction l as [|x xs IH].
+  - (* l = [] *)
+    simpl in H_in.
+    contradiction.
+  - (* l = x :: xs *)
+    simpl in H_in.
+    destruct H_in as [H_eq | H_in'].
+    + (* x = a *)
+      (* 需要证明 xs = [] *)
+      assert (forall y, In y xs -> y = a).
+      {
+        intros y H_y.
+        specialize (H_unique y).
+        destruct (classic (y = a)) as [Hya | Hnya].
+        * assumption.
+        * exfalso.
+          apply H_unique.
+          -- exact Hnya.
+          -- right. exact H_y.
+      }
+      (* 由于 l 没有重复元素，且所有 y ∈ xs 都等于 a，因此 xs 必须为空 *)
+      assert (xs = []).
+      {
+        apply list_eq_nil.
+        intros y H_y.
+        specialize (H y).
+        assert (y = a) by auto.
+        subst.
+        apply NoDup_cons_iff in H_nodup.
+        destruct H_nodup as [H_nodup _].
+        tauto.
+      }
+      subst.
+      reflexivity.
+    + (* In a xs *)
+      (* 由于 H_unique 表明除了 a 之外，列表中没有其他元素，且 x ∈ l *)
+      (* 因此 x 必须等于 a *)
+      assert (x = a).
+      {
+        specialize (H_unique x).
+        destruct (classic (x = a)) as [Hxa | Hxna].
+        * exact Hxa.
+        * exfalso.
+          apply H_unique.
+          -- exact Hxna.
+          -- left. reflexivity.
+      }
+      subst x.
+      (* 现在 l = a :: xs，且 NoDup l *)
+      (* 根据 H_unique，xs 中不能有元素不同于 a，但 l 无重复元素，故 xs 必须为空 *)
+      assert (xs = []).
+      {
+        apply list_eq_nil.
+        intros y H_y.
+        specialize (H_unique y).
+        destruct (classic (y = a)) as [Hya | Hnya].
+        * subst.
+          apply NoDup_cons_iff in H_nodup.
+          destruct H_nodup as [H_nodup _].
+          tauto.
+        * exfalso. apply H_unique.
+          -- exact Hnya.
+          -- right. exact H_y.          
+      }
+      rewrite H.
+      reflexivity.
+Qed.
+
 #[export] Instance ProbMonad_ret_mono_event:
   Proper (Basics.impl ==> ProbMonad.imply_event) ret.
-Admitted. (** Level 2 *)
+Proof. (** Level 2 *)
+  unfold Proper, Basics.impl, ProbMonad.imply_event.
+  intros P Q H.
+  simpl.
+  unfold ProbMonad.__ret.
+  unfold ProbDistr.is_det.
+  sets_unfold.
+  (* set d1 as Distr with d1.(pset) = [P] and d1.(prob) = 1%R*)
+  set (d1_prob := fun X => if eq_dec X P then 1%R else 0%R).
+  set (d1_pset := [P]).
+  set (d1:= {|
+    ProbDistr.pset := d1_pset;
+    ProbDistr.prob := d1_prob
+  |}).
+  (* set d2 as Distr with d2.(pset) = [Q] and d2.(prob) = 1%R*)
+  set (d2_prob := fun X => if eq_dec X Q then 1%R else 0%R).
+  set (d2_pset := [Q]).
+  set (d2:= {|
+    ProbDistr.pset := d2_pset;
+    ProbDistr.prob := d2_prob
+  |}).
+  exists d1, d2.
+  assert (d1_prob P = 1%R) as Hp. {
+    unfold d1_prob.
+    destruct (eq_dec P P).
+    - reflexivity.
+    - contradiction.
+  }
+  assert (d2_prob Q = 1%R) as Hq. {
+    unfold d2_prob.
+    destruct (eq_dec Q Q).
+    - reflexivity.
+    - contradiction.
+  }
+  repeat split; auto.
+  + assert (forall X, P <> X -> d1_prob X = 0%R). {
+      unfold d1_prob.
+      intros.
+      destruct (eq_dec X P).
+      + symmetry in e.
+        contradiction.
+      + reflexivity.
+    }
+    intros.
+    pose proof H0 b.
+    tauto.
+  + assert (forall X, Q <> X -> d2_prob X = 0%R). {
+      unfold d2_prob.
+      intros.
+      destruct (eq_dec X Q).
+      + symmetry in e.
+        contradiction.
+      + reflexivity.
+    }
+    intros.
+    pose proof H0 b.
+    tauto.
+  + unfold ProbDistr.imply_event.
+    pose proof ProbDistr_compute_pr_exists as Hex.
+    pose proof Hex d1 as [r1 H1].
+    pose proof Hex d2 as [r2 h2].
+    exists r1, r2.
+    repeat split; auto.
+    clear Hex.
+    unfold ProbDistr.compute_pr in *.
+    destruct H1 as [l1 [H11 [H12 H13]]].
+    destruct h2 as [l2 [H21 [H22 H23]]].
+    simpl in *.
+    destruct (classic P).
+    - assert (In P l1) as H_in_p. {
+        specialize (H11 P).
+        tauto.
+      }
+      assert (forall X, X <> P -> ~ In X l1) as H_unique_p. {
+        intros X H_neq.
+        unfold not in *.
+        intros H_in_x.
+        specialize (H11 X).
+        assert (P = X) as H_eq_px by tauto.
+        apply symmetry in H_eq_px.
+        pose proof H_neq H_eq_px.
+        contradiction.
+      }
+      assert (l1 = [P]). {
+        pose proof one_element_list H_in_p H_unique_p H13.
+        assumption.
+      }
+      assert (In Q l2) as H_in_q. {
+        specialize (H21 Q).
+        tauto.
+      }
+      assert (forall X, X <> Q -> ~ In X l2) as H_unique_q. {
+        intros X H_neq.
+        unfold not in *.
+        intros H_in_x.
+        specialize (H21 X).
+        assert (Q = X) as H_eq_qx by tauto.
+        apply symmetry in H_eq_qx.
+        pose proof H_neq H_eq_qx.
+        contradiction.
+      }
+      assert (l2 = [Q]). {
+        pose proof one_element_list H_in_q H_unique_q H23.
+        assumption.
+      }
+      subst.
+      unfold sum_prob.
+      simpl.
+      lra.
+    - assert (l1 = []) as H_l1_nil. {
+        apply list_eq_nil.
+        intros X H_in_x.
+        specialize (H11 X).
+        assert (P = X /\ X) by tauto.
+        destruct H1.
+        subst X.
+        contradiction.
+      }
+      destruct (classic Q).
+      * assert (In Q l2) as H_in_q. {
+          specialize (H21 Q).
+          tauto.
+        }
+        assert (forall X, X <> Q -> ~ In X l2) as H_unique_q. {
+          intros X H_neq.
+          unfold not in *.
+          intros H_in_x.
+          specialize (H21 X).
+          assert (Q = X) as H_eq_qx by tauto.
+          apply symmetry in H_eq_qx.
+          pose proof H_neq H_eq_qx.
+          contradiction.
+        }
+        assert (l2 = [Q]). {
+          pose proof one_element_list H_in_q H_unique_q H23.
+          assumption.
+        }
+        subst.
+        unfold sum_prob.
+        simpl.
+        lra.
+      * assert (l2 = []) as H_l2_nil. {
+          apply list_eq_nil.
+          intros X H_in_x.
+          specialize (H21 X).
+          assert (Q = X /\ X) by tauto.
+          destruct H2.
+          subst X.
+          contradiction.
+        }
+        subst.
+        unfold sum_prob.
+        simpl.
+        lra.
+Qed.
 
 #[export] Instance ProbMonad_ret_congr_event:
   Proper (iff ==> ProbMonad.equiv_event) ret.
