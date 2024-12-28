@@ -324,11 +324,94 @@ Proof.
   auto.
 Qed.
 
+Lemma Permutation_notin {A: Type}:
+  forall {l1 l2: list A} {x: A},
+    Permutation l1 l2 ->
+    ~ In x l1 ->
+    ~ In x l2.
+Proof.
+  intros.
+  intro.
+  apply H0.
+  symmetry in H.
+  pose proof Permutation_in _ H H1.
+  tauto.
+Qed.
+
+Lemma in_set_add_app {A: Type}:
+  forall (l: list A) (x: A),
+    In x l ->
+    set_add eq_dec x l = l.
+Proof.
+  intros.
+  induction l as [| a l IH].
+  - simpl.
+    destruct H.
+  - simpl.
+    destruct (eq_dec x a).
+    + subst.
+      simpl.
+      reflexivity.
+    + destruct H.
+      * subst.
+        absurd (x<>x); auto.
+      * specialize (IH H).
+        rewrite IH.
+        reflexivity.
+Qed. 
+
+Lemma notin_set_add_app {A: Type}:
+  forall (l: list A) (x: A),
+    ~ In x l ->
+    set_add eq_dec x l = l ++ [x].
+Proof.
+  intros.
+  induction l as [| a l IH].
+  - simpl.
+    destruct (eq_dec x x).
+    + reflexivity.
+    + contradiction.
+  - simpl.
+    destruct (eq_dec x a).
+    + subst.
+      destruct H.
+      simpl; left; auto.
+    + pose proof not_in_cons x a l as [H1 _].
+      specialize (H1 H).
+      destruct H1 as [H1 H2].
+      specialize (IH H2).
+      rewrite IH.
+      reflexivity.
+Qed.
+
 Lemma perm_filter_dup_cons {A: Type}:
   forall (l l1 l2: list A),
     Permutation (filter_dup l1) (filter_dup l2) ->
     Permutation (filter_dup (l ++ l1)) (filter_dup (l ++ l2)).
-Admitted.
+Proof.
+  intros.
+  induction l as [| a l IH].
+  - simpl.
+    auto.
+  - rewrite <- app_comm_cons.
+    rewrite <- app_comm_cons.
+    simpl.
+    destruct (in_dec eq_dec a (filter_dup (l ++ l1))).
+    + pose proof Permutation_in _ IH i.
+      pose proof in_set_add_app (filter_dup (l ++ l1)) a i.
+      pose proof in_set_add_app (filter_dup (l ++ l2)) a H0.
+      rewrite H1.
+      rewrite H2.
+      exact IH.
+    + pose proof Permutation_notin IH n.
+      pose proof notin_set_add_app (filter_dup (l ++ l1)) a n.
+      pose proof notin_set_add_app (filter_dup (l ++ l2)) a H0.
+      rewrite H1.
+      rewrite H2.
+      (* Search (Permutation (_ ++ _) (_ ++ _)). *)
+      apply Permutation_app_tail.
+      exact IH.
+Qed.
 
 Lemma perm_filter_dup_incl{A: Type}:
   forall (l1 l2: list A),
@@ -351,7 +434,24 @@ Lemma nodup_perm_filter_dup {A: Type}:
   forall (l: list A),
     NoDup l ->
     Permutation l (filter_dup l).
-Admitted.
+Proof.
+  intros.
+  induction H.
+  - simpl.
+    constructor.
+  - simpl.
+    assert (~ In x (filter_dup l)). {
+      pose proof Permutation_notin IHNoDup H.
+      tauto.
+    }
+    pose proof notin_set_add_app (filter_dup l) x H1.
+    rewrite H2.
+    (* Search Permutation. *)
+    rewrite Permutation_app_comm.
+    simpl.
+    apply perm_skip.
+    apply IHNoDup.
+Qed.
 
 Lemma perm_filter_dup_nodup {A: Type}:
   forall (l1 l2: list A),
@@ -2196,6 +2296,17 @@ Notation "x '.(Legal_unique)'" := (ProbMonad.Legal_unique _ x) (at level 1).
 
 Definition Always {A: Type} (c: ProbMonad.M A) (P: A -> Prop): Prop :=
   Hoare (ProbMonad.compute_pr (res <- c;; ret (P res))) (fun pr => pr = 1%R).
+
+Lemma __ret_prop_contain {A: Type} (P Q: Prop):
+  (P -> Q) -> 
+  ProbMonad.__ret P ⊆ ProbMonad.__ret Q.
+Proof.
+  sets_unfold.
+  intros.
+  split.
+  destruct H0.
+  (* ?? *)
+Admitted.
 
 Theorem Always_conseq: forall {A: Type} (P Q: A -> Prop),
   (forall a, P a -> Q a) ->
