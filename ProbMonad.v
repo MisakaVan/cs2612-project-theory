@@ -6,6 +6,7 @@ Require Import Coq.Classes.Morphisms.
 Require Import Coq.Lists.List. Import ListNotations.
 Require Import Coq.Lists.ListSet.
 Require Import Coq.Logic.Classical_Prop.
+Require Import Coq.Logic.FunctionalExtensionality.
 Import SetsNotation.
 Local Open Scope sets.
 Local Open Scope list.
@@ -99,6 +100,61 @@ End SetMonad.
 
 Definition Hoare {A: Type} (c: SetMonad.M A) (P: A -> Prop): Prop :=
   forall a, a ∈ c -> P a.
+
+
+  Theorem Hoare_bind {A B: Type}:
+  forall (f: SetMonad.M A)
+         (g: A -> SetMonad.M B)
+         (P: A -> Prop)
+         (Q: B -> Prop),
+    Hoare f P ->
+    (forall a, P a -> Hoare (g a) Q) ->
+    Hoare (bind f g) Q.
+Proof.
+  intros.
+  unfold Hoare; sets_unfold;
+  unfold bind, set_monad, SetMonad.bind.
+  intros b [a [? ?]].
+  specialize (H _ H1).
+  specialize (H0 _ H _ H2).
+  tauto.
+Qed.
+
+Theorem Hoare_ret {A: Type}:
+  forall (a: A) (P: A -> Prop),
+    P a -> Hoare (ret a) P.
+Proof.
+  intros.
+  unfold Hoare, ret, set_monad, SetMonad.ret; sets_unfold.
+  intros.
+  rewrite <- H0; tauto.
+Qed.
+
+Theorem Hoare_conseq {A: Type}:
+  forall (f: SetMonad.M A) (P Q: A -> Prop),
+    (forall a, P a -> Q a) ->
+    Hoare f P ->
+    Hoare f Q.
+Proof.
+  unfold Hoare; intros.
+  specialize (H a).
+  specialize (H0 a).
+  tauto.
+Qed.
+
+Theorem Hoare_conjunct {A: Type}:
+  forall (f: SetMonad.M A) (P Q: A -> Prop),
+    Hoare f P ->
+    Hoare f Q ->
+    Hoare f (fun a => P a /\ Q a).
+Proof.
+  unfold Hoare; intros.
+  specialize (H a).
+  specialize (H0 a).
+  tauto.
+Qed.
+
+
 
 #[export] Instance SetMonad_bind_congr (A B: Type):
   Proper (Sets.equiv ==> Sets.equiv ==> Sets.equiv)
@@ -985,6 +1041,7 @@ Proof.
 
     }
   }
+Admitted.
 
 
 Definition bind {A B: Type} (f: M A) (g: A -> M B): M B :=
@@ -1027,8 +1084,46 @@ Definition Always {A: Type} (c: ProbMonad.M A) (P: A -> Prop): Prop :=
 
 Theorem Always_conseq: forall {A: Type} (P Q: A -> Prop),
   (forall a, P a -> Q a) ->
-  (forall c, Always c P -> Always c Q).
-Admitted. (** Level 1 *)
+  (forall c, Always c Q -> Always c P).
+Proof. (** Level 1 *)
+  unfold Always.
+  unfold Hoare.
+  intros A P Q Himp c HAlways.
+  assert 
+  (forall a, 
+    a ∈ ProbMonad.compute_pr (res <- c;; ret (P res))
+      -> a ∈ ProbMonad.compute_pr (res <- c;; ret (Q res))).
+  {
+    sets_unfold.
+    intros r.
+    intros.
+    clear HAlways.
+    unfold ProbMonad.compute_pr in *.
+    simpl in *.
+
+    destruct H as [d [Hd [lp Hnodup]]].
+    exists d.
+    split.
+    + destruct Hd as [da [l [Hda_in_cd [Hforall2 H_sum_distr]]]].
+      assert 
+      (Forall2
+        (fun (a : A) '(r, d) =>
+        r = da.(prob) a /\ d ∈ ProbMonad.__ret (Q a)) da.(pset) l).
+      {
+        admit.
+      }
+      unfold ProbMonad.__bind.
+      sets_unfold.
+      exists da, l.
+      auto.
+    + destruct Hnodup as [? [? ?]].
+      unfold ProbDistr.compute_pr.
+      exists lp.
+      auto. 
+  }
+  intros r HQ.
+  auto.
+Admitted.
 
 Theorem Always_bind_ret {A B: Type}:
   forall (c2: A -> ProbMonad.M B)
@@ -1051,11 +1146,30 @@ Qed.
 
 #[export] Instance ProbMonad_imply_event_refl:
   Reflexive ProbMonad.imply_event.
-Admitted. (** Level 2 *)
-
+Proof. (** Level 2 *)
+  unfold Reflexive.
+  unfold ProbMonad.imply_event.
+  intros.
+  assert (exists d, d ∈ x.(distr)) as [d ?].
+  {
+    apply x.(legal).(Legal_exists).
+  }
+  exists d, d.
+  repeat split; auto.
+  apply ProbDistr_imply_event_refl.
+Qed.
+  
 Theorem ProbMonad_imply_event_refl_setoid:
   forall d1 d2, ProbMonad.equiv_event d1 d2 -> ProbMonad.imply_event d1 d2.
-Admitted. (** Level 2 *)
+Proof. (** Level 2 *)
+  intros.
+  unfold ProbMonad.equiv_event, ProbMonad.imply_event in *.
+  destruct H as [r1 [r2 [? [? ?]]]].
+  exists r1, r2.
+  repeat split; auto.
+  rewrite H1.
+  apply ProbDistr_imply_event_refl.
+Qed.
 
 #[export] Instance ProbMonad_equiv_equiv {A: Type}:
   Equivalence (@ProbMonad.equiv A).
@@ -1065,22 +1179,177 @@ Proof.
   apply Sets_equiv_equiv.
 Qed.
 
+Lemma ProbDistr_equiv_equiv_event:
+  forall d1 d2, ProbDistr.equiv d1 d2 -> ProbDistr.equiv_event d1 d2.
+Proof.
+  intros.
+  unfold ProbDistr.equiv, ProbDistr.equiv_event in *.
+  destruct H.
+  pose proof ProbDistr_compute_pr_exists as Hex.
+  pose proof Hex d1 as [r1 ?].
+  pose proof Hex d2 as [r2 ?].
+  exists r1, r2.
+  repeat split; auto.
+  clear Hex.
+  unfold ProbDistr.compute_pr in *.
+  destruct H1 as [l1 [H11 [H12 H13]]].
+  destruct H2 as [l2 [H21 [H22 H23]]].
+  assert (forall P, In P d1.(pset) /\ P <-> In P d2.(pset) /\ P) as H_eq_pset. {
+    split; intros.  
+    + destruct H1 as [? ?].
+      split; auto.
+      apply Permutation_in with (l := d1.(pset)); auto.
+    + destruct H1 as [? ?].
+      split; auto.
+      apply Permutation_sym in H0.
+      apply Permutation_in with (l := d2.(pset)); auto.   
+  }
+  assert (forall P, In P l1 <-> In P l2). {
+    intros.
+    split; intros.
+    + specialize (H11 P).
+      specialize (H21 P).
+      specialize (H_eq_pset P).
+      tauto.
+    + specialize (H11 P).
+      specialize (H21 P).
+      specialize (H_eq_pset P).
+      tauto.
+  }
+  destruct H12, H22.
+  unfold sum_prob.
+  assert (Permutation l1 l2). {
+    pose proof NoDup_Permutation H13 H23 H1.
+    assumption.
+  }
+  assert (d1.(prob) = d2.(prob)) as H_eq_d. {
+    apply functional_extensionality.
+    intros.
+    specialize (H x).
+    assumption.
+  }
+  rewrite <- H_eq_d.
+  apply sum_congr.
+  apply Permutation_map'.
+  assumption.
+Qed.
+  
 #[export] Instance ProbMonad_imply_event_trans:
   Transitive ProbMonad.imply_event.
-Admitted. (** Level 2 *)
+Proof. (** Level 2 *)
+  unfold Transitive, ProbMonad.imply_event.
+  intros x y z.
+  intros [dx [dy [Hx [Hy H_imp_xy]]]] [dy' [dz [Hy' [Hz H_imp_yz]]]].
+  exists dx, dz.
+  repeat split; auto.
+  assert (ProbDistr.equiv dy dy') as H_eq_dy_dy'. {
+    pose proof y.(legal).(Legal_unique) as H_unique_y.
+    pose proof H_unique_y dy dy' Hy Hy'.
+    assumption.    
+  }
+  apply ProbDistr_equiv_equiv_event in H_eq_dy_dy'.
+  apply ProbDistr_imply_event_refl_setoid in H_eq_dy_dy'.
+  pose proof ProbDistr_imply_event_trans _ _ _ H_imp_xy H_eq_dy_dy'.
+  pose proof ProbDistr_imply_event_trans _ _ _ H H_imp_yz.
+  assumption.
+Qed.
+  
 
 #[export] Instance ProbMonad_equiv_event_equiv:
   Equivalence ProbMonad.equiv_event.
-Admitted. (** Level 2 *)
+Proof. (** Level 2 *)
+  unfold ProbMonad.equiv_event.
+  split.
+  - unfold Reflexive.
+    intros.
+    assert (exists d, d ∈ x.(distr)) as [d ?].
+    {
+      apply x.(legal).(Legal_exists).
+    }
+    exists d, d.
+    repeat split; auto.
+    reflexivity.
+  - unfold Symmetric.
+    intros.
+    destruct H as [d1 [d2 [H1 [H2 Heq]]]].
+    exists d2, d1.
+    repeat split; auto.
+    symmetry.
+    auto.
+  - unfold Transitive.
+    intros x y z.
+    intros [d1 [d2 [H1 [H2 Heq]]]] [d2' [d3 [H2' [H3 Heq']]]].
+    exists d1, d3.
+    repeat split; auto.
+    assert (ProbDistr.equiv d2 d2') as H_eq_dy_dy'. {
+      pose proof y.(legal).(Legal_unique) as H_unique_y.
+      pose proof H_unique_y d2 d2' H2 H2'.
+      assumption.    
+    }
+    apply ProbDistr_equiv_equiv_event in H_eq_dy_dy'.
+    transitivity d2; auto.
+    transitivity d2'; auto.
+Qed.
 
 #[export] Instance ProbMonad_imply_event_congr:
   Proper (ProbMonad.equiv_event ==>
           ProbMonad.equiv_event ==> iff) ProbMonad.imply_event.
-Admitted. (** Level 2 *)
+Proof. (** Level 2 *)
+  unfold Proper, respectful.
+  intros x y H x0 y0 H0.
+  split; intros.
+  - apply symmetry in H.
+    apply ProbMonad_imply_event_refl_setoid in H.
+    apply ProbMonad_imply_event_refl_setoid in H0.
+    transitivity x; auto.
+    transitivity x0; auto.
+  - apply ProbMonad_imply_event_refl_setoid in H.
+    apply symmetry in H0.
+    apply ProbMonad_imply_event_refl_setoid in H0.
+    transitivity y; auto.
+    transitivity y0; auto.
+Qed.  
 
 #[export] Instance compute_pr_congr:
   Proper (ProbMonad.equiv_event ==> Sets.equiv) ProbMonad.compute_pr.
-Admitted. (** Level 2 *)
+Proof. (** Level 2 *)
+  unfold Proper, respectful.
+  intros x y H.
+  destruct H as [d1 [d2 [H1 [H2 Heq]]]].
+  sets_unfold.
+  unfold ProbMonad.compute_pr.
+  intros a.
+  split.
+  - intros Ha.
+    destruct Ha as [d [Hd Hpr]].
+    exists d2.
+    split; auto.
+    pose proof x.(legal).(Legal_unique) as H_unique_x.
+    pose proof H_unique_x d d1 Hd H1.
+    apply ProbDistr_equiv_equiv_event in H.
+    assert (Sets.equiv (ProbDistr.compute_pr d) (ProbDistr.compute_pr d2)) as Hpr2. {
+      apply ProbDistr_compute_pr_congr.
+      transitivity d1; auto.
+    }
+    sets_unfold in Hpr2.
+    specialize (Hpr2 a).
+    tauto.  
+  - intros Ha.
+    destruct Ha as [d [Hd Hpr]].
+    exists d1.
+    split; auto.
+    pose proof y.(legal).(Legal_unique) as H_unique_y.
+    pose proof H_unique_y d d2 Hd H2.
+    apply ProbDistr_equiv_equiv_event in H.
+    assert (Sets.equiv (ProbDistr.compute_pr d) (ProbDistr.compute_pr d1)) as Hpr1. {
+      apply ProbDistr_compute_pr_congr.
+      apply symmetry in Heq.
+      transitivity d2; auto.
+    }
+    sets_unfold in Hpr1.
+    specialize (Hpr1 a).
+    tauto.
+Qed.
 
 Theorem compute_pr_mono:
   forall f1 f2 r1 r2,
@@ -1088,7 +1357,29 @@ Theorem compute_pr_mono:
     ProbMonad.compute_pr f2 r2 ->
     ProbMonad.imply_event f1 f2 ->
     (r1 <= r2)%R.
-Admitted.
+Proof.
+  intros f1 f2 r1 r2 H1 H2 H_imp.
+  destruct H_imp as [d1 [d2 [Hd1 [Hd2 H_imp]]]].
+  unfold ProbMonad.compute_pr in *.
+  destruct H1 as [d1' [Hd1' Hpr1]].
+  destruct H2 as [d2' [Hd2' Hpr2]].
+  pose proof f1.(legal).(Legal_unique) as H_unique_f1.
+  specialize (H_unique_f1 d1 d1' Hd1 Hd1').
+  apply ProbDistr_equiv_equiv_event in H_unique_f1.
+  pose proof f2.(legal).(Legal_unique) as H_unique_f2.
+  specialize (H_unique_f2 d2 d2' Hd2 Hd2').
+  apply ProbDistr_equiv_equiv_event in H_unique_f2.
+  apply symmetry in H_unique_f1.
+  apply ProbDistr_imply_event_refl_setoid in H_unique_f1.
+  apply ProbDistr_imply_event_refl_setoid in H_unique_f2.
+  assert (ProbDistr.imply_event d1' d2') as H_imp_d1'_d2'. {
+    transitivity d1; auto.
+    transitivity d2; auto.
+  }
+  pose proof ProbDistr_compute_pr_mono.
+  specialize (H d1' d2' r1 r2 Hpr1 Hpr2 H_imp_d1'_d2').
+  assumption.
+Qed.
 
 #[export] Instance ProbMonad_bind_congr (A B: Type):
   Proper (ProbMonad.equiv ==>
