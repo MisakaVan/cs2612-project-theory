@@ -1434,6 +1434,7 @@ Record Legal {A: Type} (f: Distr A -> Prop): Prop := {
   Legal_exists: exists d, d ∈ f;
   Legal_legal: forall d, d ∈ f -> ProbDistr.legal d;
   Legal_unique: forall d1 d2, d1 ∈ f -> d2 ∈ f -> ProbDistr.equiv d1 d2;
+  Legal_congr: forall d1 d2, ProbDistr.equiv d1 d2 -> d1 ∈ f -> d2 ∈ f;
 }.
 
 Record M (A: Type): Type :=
@@ -1521,6 +1522,26 @@ Proof.
         reflexivity.
     + rewrite H, H0.
       reflexivity.
+  - sets_unfold.
+    intros.
+    unfold __ret in *.
+    unfold ProbDistr.is_det in *.
+    unfold ProbDistr.equiv in *.
+    destruct H as [H_prob_eq H_pset_perm].
+    destruct H0 as [H_d1_pset [H_d1_prob H_d1_prob_0]].
+    assert (
+      d1.(prob)=d2.(prob)
+    ) as H_prob_func_eq
+    by (apply functional_extensionality; assumption).
+    repeat split.
+    + rewrite H_d1_pset in H_pset_perm.
+      (* Search (Permutation _ _ -> _ = _). *)
+      apply Permutation_length_1_inv.
+      assumption.
+    + rewrite <- H_prob_func_eq.
+      assumption.
+    + rewrite <- H_prob_func_eq.
+      assumption.
 Qed.
         
 
@@ -2316,6 +2337,25 @@ Proof.
         }
       }
     }
+  }
+  {
+    sets_unfold.
+    intros d1 d2 H_equiv_d1_d2.
+    destruct H_equiv_d1_d2 as [H_prob_equiv_d1_d2 H_pset_perm_d1_d2].
+    unfold __bind.
+    intros H_bind_f_g_d1.
+    destruct H_bind_f_g_d1 as [da1 [l1 [H_da1_in_f [H_forall2_1 H_sum_distr_1]]]].
+    exists da1, l1.
+    split; auto.
+    split; auto.
+    destruct H_sum_distr_1 as [H_sum_pset_valid_1 H_sum_prob_valid_1].
+    split.
+    - transitivity d1.(pset); auto.
+      symmetry; auto.
+    - intros b.
+      pose proof H_prob_equiv_d1_d2 b.
+      rewrite <- H.
+      apply H_sum_prob_valid_1.
   }
 Qed.
 
