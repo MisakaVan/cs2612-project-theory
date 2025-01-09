@@ -2339,9 +2339,25 @@ Proof.
     }
   }
   {
-    admit. 
+    sets_unfold.
+    intros d1 d2 H_equiv_d1_d2.
+    destruct H_equiv_d1_d2 as [H_prob_equiv_d1_d2 H_pset_perm_d1_d2].
+    unfold __bind.
+    intros H_bind_f_g_d1.
+    destruct H_bind_f_g_d1 as [da1 [l1 [H_da1_in_f [H_forall2_1 H_sum_distr_1]]]].
+    exists da1, l1.
+    split; auto.
+    split; auto.
+    destruct H_sum_distr_1 as [H_sum_pset_valid_1 H_sum_prob_valid_1].
+    split.
+    - transitivity d1.(pset); auto.
+      symmetry; auto.
+    - intros b.
+      pose proof H_prob_equiv_d1_d2 b.
+      rewrite <- H.
+      apply H_sum_prob_valid_1.
   }
-Admitted.
+Qed.
 
 
 Definition bind {A B: Type} (f: M A) (g: A -> M B): M B :=
