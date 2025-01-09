@@ -518,7 +518,7 @@ Proof.
     + intro.
       specialize (IH H3).
       subst.
-      Search (In _ (_ ++ _)).
+      (* Search (In _ (_ ++ _)). *)
       assert (In a (l1 ++ l2)) by (apply in_or_app; auto).
       contradiction.
     + subst.
@@ -2436,7 +2436,7 @@ Proof.
     + specialize (IHl a0 H).
       destruct IHl as [l' H_perm].
       exists (a :: l').
-      Search Permutation.
+      (* Search Permutation. *)
       pose proof perm_swap a a0 l' as H_swap.
       pose proof Permutation_trans.
       specialize (H0 A (a :: l) (a :: a0 :: l') (a0 :: a :: l')).
