@@ -1434,6 +1434,7 @@ Record Legal {A: Type} (f: Distr A -> Prop): Prop := {
   Legal_exists: exists d, d ∈ f;
   Legal_legal: forall d, d ∈ f -> ProbDistr.legal d;
   Legal_unique: forall d1 d2, d1 ∈ f -> d2 ∈ f -> ProbDistr.equiv d1 d2;
+  Legal_congr: forall d1 d2, ProbDistr.equiv d1 d2 -> d1 ∈ f -> d2 ∈ f;
 }.
 
 Record M (A: Type): Type :=
@@ -1521,7 +1522,8 @@ Proof.
         reflexivity.
     + rewrite H, H0.
       reflexivity.
-Qed.
+  - admit.
+Admitted.
         
 
 Definition ret {A: Type} (a: A) : M A :=
@@ -2317,7 +2319,10 @@ Proof.
       }
     }
   }
-Qed.
+  {
+    admit. 
+  }
+Admitted.
 
 
 Definition bind {A B: Type} (f: M A) (g: A -> M B): M B :=
