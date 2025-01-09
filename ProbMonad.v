@@ -1522,8 +1522,27 @@ Proof.
         reflexivity.
     + rewrite H, H0.
       reflexivity.
-  - admit.
-Admitted.
+  - sets_unfold.
+    intros.
+    unfold __ret in *.
+    unfold ProbDistr.is_det in *.
+    unfold ProbDistr.equiv in *.
+    destruct H as [H_prob_eq H_pset_perm].
+    destruct H0 as [H_d1_pset [H_d1_prob H_d1_prob_0]].
+    assert (
+      d1.(prob)=d2.(prob)
+    ) as H_prob_func_eq
+    by (apply functional_extensionality; assumption).
+    repeat split.
+    + rewrite H_d1_pset in H_pset_perm.
+      (* Search (Permutation _ _ -> _ = _). *)
+      apply Permutation_length_1_inv.
+      assumption.
+    + rewrite <- H_prob_func_eq.
+      assumption.
+    + rewrite <- H_prob_func_eq.
+      assumption.
+Qed.
         
 
 Definition ret {A: Type} (a: A) : M A :=
