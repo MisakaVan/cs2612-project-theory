@@ -641,6 +641,46 @@ Proof.
     reflexivity.
 Qed.
 
+Lemma Forall2_in_r_exists:
+  forall {A B: Type} (l1: list A) (l2: list B) (f: A -> B -> Prop),
+    Forall2 f l1 l2 ->
+    forall b, In b l2 -> exists a, In a l1 /\ f a b.
+Proof.
+  intros.
+  induction H.
+  - inversion H0.
+  - destruct H0.
+    + subst.
+      exists x.
+      split; auto.
+      left; auto.
+    + apply IHForall2 in H0.
+      destruct H0 as [a [? ?]].
+      exists a.
+      split; auto.
+      right; auto.
+Qed.
+
+Lemma Forall2_in_l_exists:
+  forall {A B: Type} (l1: list A) (l2: list B) (f: A -> B -> Prop),
+    Forall2 f l1 l2 ->
+    forall a, In a l1 -> exists b, In b l2 /\ f a b.
+Proof.
+  intros.
+  induction H.
+  - inversion H0.
+  - destruct H0.
+    + subst.
+      exists y.
+      split; auto.
+      left; auto.
+    + apply IHForall2 in H0.
+      destruct H0 as [b [? ?]].
+      exists b.
+      split; auto.
+      right; auto.
+Qed.
+
 Lemma Forall2_pair_Forall2_lt_length {A B1 B2: Type}:
   forall n,
   forall
@@ -1588,46 +1628,6 @@ Proof.
     destruct H0.
     + left. auto.
     + right. apply H. auto.
-Qed.
-
-Lemma Forall2_in_r_exists:
-  forall {A B: Type} (l1: list A) (l2: list B) (f: A -> B -> Prop),
-    Forall2 f l1 l2 ->
-    forall b, In b l2 -> exists a, In a l1 /\ f a b.
-Proof.
-  intros.
-  induction H.
-  - inversion H0.
-  - destruct H0.
-    + subst.
-      exists x.
-      split; auto.
-      left; auto.
-    + apply IHForall2 in H0.
-      destruct H0 as [a [? ?]].
-      exists a.
-      split; auto.
-      right; auto.
-Qed.
-
-Lemma Forall2_in_l_exists:
-  forall {A B: Type} (l1: list A) (l2: list B) (f: A -> B -> Prop),
-    Forall2 f l1 l2 ->
-    forall a, In a l1 -> exists b, In b l2 /\ f a b.
-Proof.
-  intros.
-  induction H.
-  - inversion H0.
-  - destruct H0.
-    + subst.
-      exists y.
-      split; auto.
-      left; auto.
-    + apply IHForall2 in H0.
-      destruct H0 as [b [? ?]].
-      exists b.
-      split; auto.
-      right; auto.
 Qed.
 
 
