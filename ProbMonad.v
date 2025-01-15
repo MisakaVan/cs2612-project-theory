@@ -2394,6 +2394,7 @@ Notation "x '.(legal)'" := (ProbMonad.legal x) (at level 1).
 Notation "x '.(Legal_exists)'" := (ProbMonad.Legal_exists _ x) (at level 1).
 Notation "x '.(Legal_legal)'" := (ProbMonad.Legal_legal _ x) (at level 1).
 Notation "x '.(Legal_unique)'" := (ProbMonad.Legal_unique _ x) (at level 1).
+Notation "x '.(Legal_congr)'" := (ProbMonad.Legal_congr _ x) (at level 1).
 
 Definition Always {A: Type} (c: ProbMonad.M A) (P: A -> Prop): Prop :=
   Hoare (ProbMonad.compute_pr (res <- c;; ret (P res))) (fun pr => pr = 1%R).
