@@ -861,6 +861,38 @@ Proof.
   auto.
 Qed.
 
+Lemma in_in_app_app:
+  forall {A: Type} (a: A) (l1 l2 l0: list A),
+    (
+      In a l1 -> In a l2
+    ) ->
+    (
+      In a (l0 ++ l1) -> In a (l0 ++ l2)
+    ).
+Proof.
+  intros.
+  - apply in_app_or in H0.
+    apply in_or_app.
+    destruct H0.
+    + left. auto.
+    + right. apply H. auto.
+Qed.
+
+
+Lemma Rge_ne_gt:
+  forall r1 r2,
+    (r1 >= r2)%R ->
+    r1 <> r2 ->
+    (r1 > r2)%R.
+Proof.
+  intros.
+  destruct (Rgt_ge_dec r1 r2).
+  - auto.
+  - pose proof Rge_le r1 r2 H.
+    pose proof Rge_antisym _ _ H r.
+    contradiction.
+Qed.
+
 (*********************************************************)
 (**                                                      *)
 (** Probability Distribution                             *)
@@ -883,6 +915,105 @@ Proof.
     lra.
   - simpl.
     rewrite IHl1.
+    lra.
+Qed.
+
+Lemma sum_map_add:
+  forall {A: Type},
+  forall (l: list A),
+    forall (f f1 f2: A -> R),
+    (forall a, f a = f1 a + f2 a)%R ->
+    (sum (map f l) = sum (map f1 l) + sum (map f2 l))%R.
+Proof.
+  intros.
+  induction l.
+  - simpl.
+    rewrite Rplus_0_r.
+    reflexivity.
+  - simpl.
+    rewrite IHl.
+    rewrite H.
+    lra.
+Qed.
+
+Lemma sum_map_sum_map:
+  forall (A B: Type) (la: list A) (lb: list B) (g: B -> A -> R),
+    sum (
+      map (fun a => 
+                sum (
+                  map (fun b => (g b) a) 
+                  lb)
+          )
+      la
+    )
+    =
+    sum (
+      map (fun b =>
+                sum (
+                  map (fun a => (g b) a) 
+                  la)
+          )
+      lb
+    ).
+Proof.
+  intros.
+  induction la as [| a la IHa], lb as [| b lb].
+  - simpl.
+    reflexivity.
+  - simpl.
+    enough (sum (map (fun _ : B => 0) lb) = 0)%R.
+    {
+      rewrite H.
+      rewrite Rplus_0_r; reflexivity.
+    }
+    induction lb.
+    + simpl; reflexivity.
+    + simpl; rewrite IHlb; rewrite Rplus_0_r; reflexivity.
+  - simpl.
+    enough (sum (map (fun _ : A => 0) la) = 0)%R.
+    {
+      rewrite H.
+      rewrite Rplus_0_r; reflexivity.
+    }
+    simpl in IHa.
+    assumption.
+  - simpl in *.
+
+    (* Search (?x + _ = ?x + _)%R. *)
+    (* SearchRewrite ((_ + _)+_)%R. *)
+    rewrite Rplus_assoc.
+    rewrite Rplus_assoc.
+    apply Rplus_eq_compat_l.
+    rewrite IHa.
+    rewrite Rplus_comm.
+    rewrite Rplus_assoc.
+    apply Rplus_eq_compat_l.
+    pose proof sum_map_add lb.
+    assert (
+      forall b: B,
+      (fun b0 : B => (g b0 a + sum (map (fun a0 : A => g b0 a0) la))%R) b =
+      (fun b0 : B => (sum (map (fun a0 : A => g b0 a0) la))%R) b
+      +
+      (fun b0 : B => (g b0 a)%R) b
+    )%R. {
+      intros.
+      lra.
+    }
+    specialize (H _ _ _ H0).
+    rewrite H.
+    reflexivity.
+Qed.
+
+Lemma sum_map_multi:
+  forall {A: Type} (l: list A) (f: A -> R) (r: R),
+    sum (map (fun a => r * f a) l)%R = (r * sum (map f l))%R.
+Proof.
+  intros.
+  induction l.
+  - simpl.
+    lra.
+  - simpl.
+    rewrite IHl.
     lra.
 Qed.
 
@@ -1692,136 +1823,6 @@ Definition __bind {A B: Type}
       s1.(pset) l /\
     ProbDistr.sum_distr l s2.
 
-Lemma in_in_app_app:
-  forall {A: Type} (a: A) (l1 l2 l0: list A),
-    (
-      In a l1 -> In a l2
-    ) ->
-    (
-      In a (l0 ++ l1) -> In a (l0 ++ l2)
-    ).
-Proof.
-  intros.
-  - apply in_app_or in H0.
-    apply in_or_app.
-    destruct H0.
-    + left. auto.
-    + right. apply H. auto.
-Qed.
-
-
-Lemma Rge_ne_gt:
-  forall r1 r2,
-    (r1 >= r2)%R ->
-    r1 <> r2 ->
-    (r1 > r2)%R.
-Proof.
-  intros.
-  destruct (Rgt_ge_dec r1 r2).
-  - auto.
-  - pose proof Rge_le r1 r2 H.
-    pose proof Rge_antisym _ _ H r.
-    contradiction.
-Qed.
-
-Lemma sum_map_add:
-  forall {A: Type},
-  forall (l: list A),
-    forall (f f1 f2: A -> R),
-    (forall a, f a = f1 a + f2 a)%R ->
-    (sum (map f l) = sum (map f1 l) + sum (map f2 l))%R.
-Proof.
-  intros.
-  induction l.
-  - simpl.
-    rewrite Rplus_0_r.
-    reflexivity.
-  - simpl.
-    rewrite IHl.
-    rewrite H.
-    lra.
-Qed.
-
-Lemma sum_map_sum_map:
-  forall (A B: Type) (la: list A) (lb: list B) (g: B -> A -> R),
-    sum (
-      map (fun a => 
-                sum (
-                  map (fun b => (g b) a) 
-                  lb)
-          )
-      la
-    )
-    =
-    sum (
-      map (fun b =>
-                sum (
-                  map (fun a => (g b) a) 
-                  la)
-          )
-      lb
-    ).
-Proof.
-  intros.
-  induction la as [| a la IHa], lb as [| b lb].
-  - simpl.
-    reflexivity.
-  - simpl.
-    enough (sum (map (fun _ : B => 0) lb) = 0)%R.
-    {
-      rewrite H.
-      rewrite Rplus_0_r; reflexivity.
-    }
-    induction lb.
-    + simpl; reflexivity.
-    + simpl; rewrite IHlb; rewrite Rplus_0_r; reflexivity.
-  - simpl.
-    enough (sum (map (fun _ : A => 0) la) = 0)%R.
-    {
-      rewrite H.
-      rewrite Rplus_0_r; reflexivity.
-    }
-    simpl in IHa.
-    assumption.
-  - simpl in *.
-
-    (* Search (?x + _ = ?x + _)%R. *)
-    (* SearchRewrite ((_ + _)+_)%R. *)
-    rewrite Rplus_assoc.
-    rewrite Rplus_assoc.
-    apply Rplus_eq_compat_l.
-    rewrite IHa.
-    rewrite Rplus_comm.
-    rewrite Rplus_assoc.
-    apply Rplus_eq_compat_l.
-    pose proof sum_map_add lb.
-    assert (
-      forall b: B,
-      (fun b0 : B => (g b0 a + sum (map (fun a0 : A => g b0 a0) la))%R) b =
-      (fun b0 : B => (sum (map (fun a0 : A => g b0 a0) la))%R) b
-      +
-      (fun b0 : B => (g b0 a)%R) b
-    )%R. {
-      intros.
-      lra.
-    }
-    specialize (H _ _ _ H0).
-    rewrite H.
-    reflexivity.
-Qed.
-
-Lemma sum_map_multi:
-  forall {A: Type} (l: list A) (f: A -> R) (r: R),
-    sum (map (fun a => r * f a) l)%R = (r * sum (map f l))%R.
-Proof.
-  intros.
-  induction l.
-  - simpl.
-    lra.
-  - simpl.
-    rewrite IHl.
-    lra.
-Qed.
 
 Lemma __bind_legal {A B: Type}:
   forall (f: Distr A -> Prop) (g: A -> Distr B -> Prop),
