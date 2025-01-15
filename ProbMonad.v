@@ -4035,6 +4035,151 @@ Lemma bind_assoc:
          (h: B -> ProbMonad.M C),
   bind (bind f g) h ==
   bind f (fun a => bind (g a) h).
+Proof.
+  intros.
+  unfold ProbMonad.equiv.
+  sets_unfold.
+  intros dc.
+  simpl.
+  split.
+  {
+    unfold ProbMonad.__bind.
+    intros H.
+    destruct H as [db [lbc H]].
+    destruct H as [Hdb [Hlbc H_sum_distr_lbdc]].
+    destruct Hdb as [da [lab [Hda [Hlab H_sum_distr_ladb]]]].
+
+    assert (
+      exists lac: list (R * Distr C),
+        Forall2 (fun a '(r, d) => 
+                  r = da.(prob) a /\ 
+                  exists ga: Distr B, (g a).(distr) ga /\
+                  exists l_sum_to_bc: list (R * Distr C),
+                    (Forall2 (fun b '(r, d) => 
+                                r = ga.(prob) b /\ d ∈ (h b).(distr)) 
+                      ga.(pset) l_sum_to_bc) /\
+                      ProbDistr.sum_distr l_sum_to_bc d)
+        da.(pset) lac
+    ) as H_exists_lac. 
+    {
+      clear Hlab.
+      induction da.(pset) as [|a l].
+      - exists nil.
+        repeat constructor.
+      - destruct IHl as [lac Hlac].
+        pose proof (g a).(legal).(Legal_exists) as [ga Hga].
+        pose proof (bind (g a) h).(legal).(Legal_exists) as [ga_h Hga_h].
+        exists ((da.(prob) a, ga_h) :: lac).
+        constructor.
+        2: {
+          apply Hlac.
+        }
+        sets_unfold in Hga.
+        sets_unfold in Hga_h.
+        split; auto.
+        simpl in Hga_h.
+        unfold ProbMonad.__bind in Hga_h.
+        sets_unfold in Hga_h.
+        destruct Hga_h as [gb [lbc' [Hgb [Hlbc' H_sum_gb]]]].
+        pose proof (g a).(legal).(Legal_unique) _ _ Hga Hgb as H_unique_ga_gb.
+        destruct H_unique_ga_gb as [H_prob_ga_gb H_perm_ga_gb].
+        assert (ga.(prob) = gb.(prob)) as H_prob_eq by (apply functional_extensionality; auto).
+        symmetry in H_perm_ga_gb.
+        pose proof Forall2_perm_l_exists _ _ _ _ H_perm_ga_gb Hlbc' as [lbc'' [Hlbc''_1 Hlbc''_2]].
+        exists ga.
+        split; auto.
+        exists lbc''.
+        split; auto.
+        + rewrite H_prob_eq.
+          apply Hlbc''_2.
+        + rewrite <- Hlbc''_1.
+          apply H_sum_gb.
+    }
+    destruct H_exists_lac as [lac Hlac].
+    exists da, lac.
+    split.
+    2: split.
+    {
+      auto.
+    }
+    {
+      pose proof Forall2_imply da.(pset) lac as H_forall2_imply.
+      eapply H_forall2_imply. 1: apply Hlac.
+      clear H_forall2_imply.
+      (* prove the above predicate imply the below one *)
+      intros a [r d].
+      intros H_in_da H_in_lac [H_eq H_exists].
+      destruct H_exists as [ga [Hga [l_sum_to_bc [H_forall2_bc H_sum_bc]]]].
+      split; auto.
+      sets_unfold.
+      exists ga, l_sum_to_bc.
+      split; auto.
+    }
+    split.
+    {
+      destruct H_sum_distr_lbdc as [H_sum_lbdc _].
+      destruct H_sum_distr_ladb as [H_sum_ladb _].
+      rewrite H_sum_lbdc.
+      apply Permutation_filter_dup_filter_dup_incl_inv.
+      intros c.
+      split.
+      {
+        intros H_c_in_lbc.
+        pose proof In_concat_map_exists _ _ _ H_c_in_lbc as H_c_in_lbc_ex.
+        destruct H_c_in_lbc_ex as [[r dc'] [H_in_lbc' H_in_dc']].
+        pose proof Forall2_in_r_exists _ _ _ Hlbc _ H_in_lbc' as H_lbc'.
+        destruct H_lbc' as [b [H_in_dbpset [_ H_dc'_hb]]].
+        rewrite H_sum_ladb in H_in_dbpset.
+        apply filter_dup_incl in H_in_dbpset.
+        pose proof In_concat_map_exists _ _ _ H_in_dbpset as H_in_dbpset_ex.
+        destruct H_in_dbpset_ex as [[r' db'] [H_in_lab' H_in_db']].
+        pose proof Forall2_in_r_exists _ _ _ Hlab _ H_in_lab' as H_lab'.
+        destruct H_lab' as [a' [H_in_dapset [_ H_dc'_ha]]].
+
+        pose proof Forall2_in_l_exists _ _ _ Hlac _ H_in_dapset as H_lac.
+        destruct H_lac as [[rb dc''] [H_in_lac' [_ H2]]].
+        destruct H2 as [gb [H_gb [l_sum_to_bc [H_forall2_bc H_sum_bc]]]].
+
+        apply In_in_concat_map.
+        exists (rb, dc''); split; auto.
+
+        destruct H_sum_bc as [H_sum_bc _].
+        rewrite H_sum_bc.
+        apply filter_dup_in_inv.
+        apply In_in_concat_map.
+
+        assert (Permutation db'.(pset) gb.(pset)) as H_perm_db'pset_gbpset. {
+          pose proof (g a').(legal).(Legal_unique) _ _ H_dc'_ha H_gb as H_unique_ga_gb.
+          destruct H_unique_ga_gb as [_ H_perm_eq].
+          assumption.
+        }
+        symmetry in H_perm_db'pset_gbpset.
+        pose proof Forall2_perm_l_exists _ _ _ _ H_perm_db'pset_gbpset H_forall2_bc as [l_sum_to_bc' [H_perm_bc_bc' H_forall2_bc']].
+
+        pose proof Forall2_in_l_exists _ _ _ H_forall2_bc' _ H_in_db' as H_bc.
+        destruct H_bc as [[rc dc'''] [H_in_gbpset [H_prob_eq H_in_hb]]].
+        exists (rc, dc''').
+        split; [rewrite H_perm_bc_bc'; auto|].
+
+        (* dc' anc dc''' are both from (h b).(distr) *)
+        pose proof (h b).(legal).(Legal_unique) _ _ H_in_hb H_dc'_hb as H_unique_dc'_dc'''.
+        destruct H_unique_dc'_dc''' as [_ H_perm_dc'_dc'''].
+        rewrite H_perm_dc'_dc'''.
+        assumption.
+      }
+      {
+        (* should be similar *)
+        admit.
+      }
+    }
+    {
+      intros c.
+      admit.
+    }
+  }
+  {
+    admit.
+  }
 Admitted. (** Level 3 *)
 
 Lemma bind_assoc_event:
