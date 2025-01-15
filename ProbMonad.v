@@ -73,6 +73,14 @@ Proof.
       right; auto.
 Qed.
 
+Lemma Forall2_perm_l_exists:
+  forall {A B: Type} (l1: list A) (l2: list B) (f: A -> B -> Prop) (l1': list A),
+    Permutation l1 l1' ->
+    Forall2 f l1 l2 ->
+    exists l2', Permutation l2 l2' /\ Forall2 f l1' l2'.
+Proof.
+Admitted.
+
 (*********************************************************)
 (**                                                      *)
 (** General Definition of Monad                          *)
@@ -306,6 +314,22 @@ Proof.
           apply IH.
           auto.
         }
+Qed.
+
+Lemma Permutation_filter_dup_filter_dup_incl_inv:
+  forall {A: Type} (l1 l2: list A),
+    (forall x, In x l1 <-> In x l2) ->
+    Permutation (filter_dup l1) (filter_dup l2).
+Proof.
+  intros.
+  apply NoDup_Permutation.
+  - apply filter_dup_nodup.
+  - apply filter_dup_nodup.
+  - intros.
+    specialize (filter_dup_incl l1 x).
+    specialize (filter_dup_incl l2 x).
+    specialize (H x).
+    tauto.
 Qed.
 
 Lemma filter_dup_in {A: Type}:
@@ -807,6 +831,36 @@ Proof.
   all: auto.
 Qed.
 
+Lemma In_concat_map_exists {A B: Type}:
+  forall (l: list A) (f: A -> list B) (b: B),
+    In b (concat (map f l)) ->
+    exists a, In a l /\ In b (f a).
+Proof.
+  intros.
+  apply in_concat in H.
+  destruct H as [l' [? ?]].
+  apply in_map_iff in H.
+  destruct H as [a [? ?]].
+  subst.
+  exists a.
+  auto.
+Qed.
+
+Lemma In_in_concat_map {A B: Type}:
+  forall (l: list A) (f: A -> list B) (b: B),
+    (exists a, In a l /\ In b (f a)) ->
+    In b (concat (map f l)).
+Proof.
+  intros.
+  destruct H as [a [? ?]].
+  apply in_concat.
+  exists (f a).
+  split; auto.
+  apply in_map_iff.
+  exists a.
+  auto.
+Qed.
+
 (*********************************************************)
 (**                                                      *)
 (** Probability Distribution                             *)
@@ -908,6 +962,31 @@ Notation "x '.(legal_pset_valid)'" := (ProbDistr.legal_pset_valid _ x) (at level
 Notation "x '.(legal_prob_1)'" := (ProbDistr.legal_prob_1 _ x) (at level 1).
 
 (* Lemmas *)
+
+Lemma sum_distr_exists:
+  forall {A: Type} (ds: list (R * Distr A)),
+    exists d0, ProbDistr.sum_distr ds d0.
+Proof.
+  intros.
+  exists {| ProbDistr.prob := fun a => sum (map (fun '(r, d) => r * d.(prob) a) ds)%R;
+            ProbDistr.pset := filter_dup (concat (map (fun '(r, d) => d.(pset)) ds)) |}.
+  split.
+  - simpl.
+    reflexivity.
+  - intros.
+    simpl.
+    reflexivity.
+Qed.
+
+(* permutation of ds is ok with sum_distr *)
+(* export as congr instance *)
+#[export] Instance sum_distr_perm {A: Type}:
+  Proper (Permutation (A:=(R * Distr A)) ==> eq ==> iff) (@ProbDistr.sum_distr A).
+Proof.
+  unfold Proper, respectful.
+  intros.
+Admitted.
+
 
 Lemma incl_nodup_perm:
   forall {A: Type} (l1 l2: list A),
@@ -3928,6 +4007,25 @@ Proof. (** Level 2 *)
   pose proof Hmono P Q Hpq.
   pose proof Hmono Q P Hqp.
   apply ProbMonad_imply_event_equiv_event; auto.
+Qed.
+
+Lemma Forall2_imply:
+  forall {A B: Type} (l1: list A) (l2: list B) (P Q: A -> B -> Prop) ,
+    Forall2 P l1 l2 ->
+    (forall a b, 
+      In a l1 -> In b l2 -> P a b -> Q a b) ->
+    Forall2 Q l1 l2.
+Proof.
+  intros A B l1 l2  P Q H_forall2 H_imp.
+  induction H_forall2.
+  - constructor.
+  - constructor.
+    + apply H_imp.
+      all: simpl; auto.
+    + apply IHH_forall2.
+      intros.
+      apply H_imp.
+      all: simpl; auto.
 Qed.
 
 Lemma bind_assoc:
