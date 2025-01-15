@@ -3486,7 +3486,8 @@ Proof.
   unfold ProbMonad.__bind in *.
   destruct Hdx as [dA_x [lx [Hdx [Hlx H_sum_lx]]]].
   destruct Hdy as [dA_y [ly [Hdy [Hly H_sum_ly]]]].
-
+Admitted.
+(* 
 Proof. 
   unfold Proper, pointwise_relation, respectful.
   unfold ProbMonad.equiv, ProbMonad.imply_event in *.
@@ -3507,7 +3508,7 @@ Proof.
     split; auto.
     apply (H dA_x).
     auto.
-Qed.
+Qed. *)
 
 (* 
 Proof. 
@@ -4029,6 +4030,86 @@ Proof.
       all: simpl; auto.
 Qed.
 
+
+Lemma map_map_eq_Forall2:
+  forall {A B C: Type} (l1: list A) (l2: list B) (f: A -> C) (g: B -> C),
+    Forall2 (fun a b => f a = g b) l1 l2 ->
+    map f l1 = map g l2.
+Proof.
+  intros A B C l1 l2 f g H_forall2.
+  induction H_forall2.
+  - reflexivity.
+  - simpl.
+    rewrite IHH_forall2.
+    rewrite H.
+    reflexivity.
+Qed.
+
+Lemma In_combine_Forall2:
+  forall {A B: Type} (l1: list A) (l2: list B) (a: A) (b: B) (f: A -> B -> Prop),
+    In (a, b) (combine l1 l2) ->
+    Forall2 f l1 l2 ->
+    f a b.
+Proof.
+Admitted.
+
+Lemma combine_exists:
+  forall {A B: Type} (l: list (A * B)),
+  exists l1 l2,
+    l = combine l1 l2.
+Proof.
+  intros A B l.
+  induction l as [| [a b] l IH].
+  - exists [], [].
+    reflexivity.
+  - destruct IH as [l1 [l2 IH]].
+    exists (a :: l1), (b :: l2).
+    simpl.
+    rewrite IH.
+    reflexivity.
+Qed.
+
+Lemma map_fst_combine:
+  forall {A B C: Type} (l1: list A) (l2: list B),
+    map fst (combine l1 l2) = l1.
+Proof.
+Admitted.
+
+Lemma map_snd_combine:
+  forall {A B C: Type} (l1: list A) (l2: list B),
+    map snd (combine l1 l2) = l2.
+Proof.
+Admitted.
+
+Lemma map_map_common_combine:
+  forall {A B C D: Type} (l1: list A) (l2: list B) (l3: list C) (f: A * C -> D) (g: B * C -> D),
+  map f (combine l1 l3) = map g (combine l2 l3) ->
+  Forall (fun '(a, (b, c)) => f (a, c) = g (b, c)) (combine l1 (combine l2 l3)).
+Admitted.
+
+Lemma combine_permutation_l_exists_holds:
+  forall {A B: Type} (l1: list A) (l2: list B)
+    (l1': list A),
+    Permutation l1 l1' ->
+    exists l2',
+      Permutation l2 l2' /\
+      Permutation (combine l1 l2) (combine l1' l2') /\
+      (* all the Forall2 still holds *)
+      (forall pred, Forall2 pred l1 l2 -> Forall2 pred l1' l2').
+Proof.
+Admitted.
+
+Lemma combine_Forall2:
+  forall {A B C: Type} (l1: list A) (l2: list B) (l3: list C) (f: A -> B -> C -> Prop),
+    (forall a b c,
+      In (a, b) (combine l1 l2) ->
+      In (a, c) (combine l1 l3) ->
+      f a b c ) ->
+    Forall2 (fun '(a, b) '(a', c) => a=a' /\ f a b c) (combine l1 l2) (combine l1 l3).
+Proof.
+Admitted.
+      
+
 Lemma bind_assoc:
   forall (A B C: Type)
          (f: ProbMonad.M A)
@@ -4169,13 +4250,360 @@ Proof.
         assumption.
       }
       {
-        (* should be similar *)
-        admit.
+        admit. (* should be similar *)
       }
     }
     {
       intros c.
-      admit.
+      destruct H_sum_distr_ladb as [_ H_sum_ladb].
+      destruct H_sum_distr_lbdc as [_ H_sum_lbdc].
+      rewrite H_sum_lbdc.
+      remember (sum (map (fun '(r, d) => (r * d.(prob) c)%R) lbc)) as lhs.
+      assert (
+        lhs
+        =
+        sum (map (fun '(b, (r, d)) => (db.(prob) b * d.(prob) c)%R) (combine db.(pset) lbc))
+      ) as Hlhs1.
+      {
+        subst lhs.
+        f_equal.
+        clear H_sum_lbdc.
+        induction Hlbc.
+        - simpl. reflexivity.
+        - simpl.
+          rewrite IHHlbc.
+          destruct y.
+          destruct H.
+          rewrite H.
+          reflexivity.
+      }
+      clear Heqlhs.
+      assert (
+        db.(prob)
+        =
+        fun b => sum (map (fun '(r, d) => (r * d.(prob) b)%R) lab)
+      ) as Hdbprob by (apply functional_extensionality; auto).
+      assert (
+        (fun b : B => sum (map (fun '(r, d) => (r * d.(prob) b)%R) lab))
+        =
+        fun b => sum (map (fun '(a, (r, d)) => (da.(prob) a * d.(prob) b)%R) (combine da.(pset) lab))
+      ). {
+        apply functional_extensionality.
+        intros b.
+        f_equal.
+        clear H_sum_ladb.
+        clear Hlac.
+        clear Hdbprob.
+        induction Hlab.
+        - simpl. reflexivity.
+        - simpl.
+          rewrite IHHlab.
+          destruct y.
+          destruct H.
+          rewrite H.
+          reflexivity.
+      }
+      rewrite H in Hdbprob.
+      clear H.
+      rewrite Hdbprob in Hlhs1.
+      clear Hdbprob.
+
+      (* Check sum_map_sum_map. *)
+
+      assert (
+        lhs =
+        sum
+          (map
+             (fun '(b, y) =>
+              let
+              '(_, d) := y in
+               (sum
+                  (map
+                     (fun '(a, y0) =>
+                      let
+                      '(_, d0) := y0 in
+                       da.(prob) a * d0.(prob) b * 
+                       d.(prob) c)
+                     (combine da.(pset) lab)) )%R) (combine db.(pset) lbc))
+      ) as Hlhs2. {
+        subst lhs.
+        f_equal.
+        f_equal.
+        apply functional_extensionality.
+        intros [b [r d]].
+        pose proof sum_map_multi (combine da.(pset) lab) (fun '(a, y) =>
+        let '(_, d0) := y in da.(prob) a * d0.(prob) b)%R (d.(prob) c).
+        (* SearchRewrite (_ * _)%R. *)
+        rewrite Rmult_comm.
+        rewrite <- H.
+        f_equal.
+        f_equal.
+        apply functional_extensionality.
+        intros [a [r' d0]].
+        lra.
+      }
+      clear Hlhs1.
+      pose proof sum_map_sum_map as H.
+      specialize (H _ _ (combine db.(pset) lbc) (combine da.(pset) lab)).
+      specialize (H 
+      (
+          (fun '(a, y0) =>
+          let
+          '(_, d0) := y0 in
+          fun '(b, y) =>
+          let
+          '(_, d) := y in
+          ((da.(prob) a) * (d0.(prob) b) * (d.(prob) c))%R))
+      ).
+      assert (lhs =
+      sum
+      (map
+         (fun a : B * (R * Distr C) =>
+          sum
+            (map
+               (fun b : A * (R * Distr B) =>
+                (fun '(a0, y0) =>
+                 let
+                 '(_, d0) := y0 in
+                  fun '(b0, y) =>
+                  let
+                  '(_, d) := y in
+                   (da.(prob) a0 * d0.(prob) b0 * d.(prob) c)%R) b a)
+               (combine da.(pset) lab))) (combine db.(pset) lbc))
+      ) as H_lhs3. {
+        clear H.
+        subst lhs.
+        f_equal.
+        f_equal.
+        apply functional_extensionality.
+        intros [b [r d]].
+        f_equal.
+        f_equal.
+        apply functional_extensionality.
+        intros [a [r' d0]].
+        lra.
+      }
+      clear Hlhs2.
+      remember (sum
+      (map
+         (fun a : B * (R * Distr C) =>
+          sum
+            (map
+               (fun b : A * (R * Distr B) =>
+                (fun '(a0, y0) =>
+                 let
+                 '(_, d0) := y0 in
+                  fun '(b0, y) =>
+                  let
+                  '(_, d) := y in
+                   (da.(prob) a0 * d0.(prob) b0 * d.(prob) c)%R) b a)
+               (combine da.(pset) lab))) (combine db.(pset) lbc))) as lhs4.
+      rewrite H in H_lhs3.
+      clear H lhs4 Heqlhs4.
+
+      (* clear H_lhs3. *)
+      remember (sum (map (fun '(r, d) => (r * d.(prob) c)%R) lac)) as rhs.
+      assert (
+        (* sum (map (fun '(r, d) => (r * d.(prob) c)%R) lac) *)
+        rhs = 
+        sum (map (fun '(a, (r, d)) => (da.(prob) a * d.(prob) c)%R) (combine da.(pset) lac))
+      ) as Hrhs1. {
+        clear H_lhs3.
+        subst rhs.
+        f_equal.
+        clear H_sum_lbdc.
+        clear Hlab.
+        induction Hlac.
+        - simpl. reflexivity.
+        - simpl.
+          rewrite IHHlac.
+          destruct y.
+          destruct H.
+          rewrite H.
+          reflexivity.
+      }
+      clear Heqrhs.
+
+      subst rhs.
+      subst lhs.
+      f_equal.
+      (* Search (map _ _ = map _ _). *)
+      apply map_map_eq_Forall2.
+
+      remember (fun (a : A * (R * Distr B)) (b : A * (R * Distr C))
+      =>
+      sum
+        (map
+           (fun a0 : B * (R * Distr C) =>
+            (let
+             '(a1, y0) := a in
+              let
+              '(_, d0) := y0 in
+               fun '(b0, y) =>
+               let
+               '(_, d) := y in
+                (da.(prob) a1 * d0.(prob) b0 * d.(prob) c)%R)
+              a0) (combine db.(pset) lbc)) =
+      (let
+       '(a0, y) := b in
+        let '(_, d) := y in (da.(prob) a0 * d.(prob) c)%R))
+      as pred.
+      enough (
+        forall a b c,
+        In (a, b) (combine da.(pset) lab) ->
+        In (a, c) (combine da.(pset) lac) ->
+        pred (a, b) (a, c)
+      ). {
+        pose proof combine_Forall2 da.(pset) lab lac.
+        specialize (H0 (fun a b c => pred (a, b) (a, c))).
+        specialize (H0 H).
+        eapply Forall2_imply.
+        - apply H0.
+        - intros.
+          destruct a, b.
+          destruct H3.
+          subst a.
+          assumption.
+      }
+      subst pred.
+      intros a [r1 d1] [r2 d2] H_in_lab H_in_lac.
+      (* Search combine. *)
+      pose proof In_combine_Forall2 _ _ _ _ _ H_in_lab Hlab as Har1d1.
+      pose proof In_combine_Forall2 _ _ _ _ _ H_in_lac Hlac as Har2d2.
+      simpl in Har1d1, Har2d2.
+      destruct Har1d1 as [H_r1 H_d1].
+      destruct Har2d2 as [H_r2 H_d2].
+      destruct H_d2 as [ga [Hga [l_sum_to_bc [H_forall2_bc H_sum_bc]]]].
+      destruct H_sum_bc as [_ H_sum_bc].
+      assert (
+        sum
+          (map
+            (fun '(b0, y) =>
+              let
+              '(_, d) := y in
+              (da.(prob) a * d1.(prob) b0 * d.(prob) c)%R)
+            (combine db.(pset) lbc))
+     =
+     da.(prob) a * 
+        sum
+          (map
+              (fun '(b0, y) =>
+              let
+              '(_, d) := y in
+                (d1.(prob) b0 * d.(prob) c)%R)
+              (combine db.(pset) lbc))
+      )%R. {
+        rewrite <- sum_map_multi.
+        f_equal.
+        f_equal.
+        apply functional_extensionality.
+        intros [b0 [r d]].
+        lra.
+      }
+      rewrite H; clear H.
+      apply Rmult_eq_compat_l.
+      rewrite H_sum_bc.
+
+      (* rhs *)
+      assert (
+        sum 
+        (map 
+          (fun '(r, d) => (r * d.(prob) c)%R) 
+          l_sum_to_bc
+        )
+        =
+        sum 
+        (map 
+          (fun '(b0, (r, d)) => (ga.(prob) b0 * d.(prob) c)%R) (combine ga.(pset) l_sum_to_bc))
+        ) as H_rhs1. {
+          f_equal.
+          clear H_sum_bc.
+          induction H_forall2_bc.
+          - simpl. reflexivity.
+          - simpl.
+            rewrite IHH_forall2_bc.
+            destruct y.
+            destruct H.
+            rewrite H.
+            reflexivity.
+        }
+        rewrite H_rhs1; clear H_rhs1.
+        pose proof (g a).(legal).(Legal_unique) _ _ Hga H_d1 as H_unique_ga_d1.
+        destruct H_unique_ga_d1 as [H_prob_ga_d1 H_perm_ga_d1].
+
+        (* summing db.(pset) with d1.(prob)
+           is equal to summing along the d1.(pset)
+           as all those b's not in d1.(pset) get a multiplier of 0.  *)
+
+        remember (fun '(b0, y) =>
+        let '(_, d) := y in (d1.(prob) b0 * d.(prob) c)%R) as calc.
+        assert (
+          exists filtered_dbpset filtered_lbc,
+          sum (map calc (combine filtered_dbpset filtered_lbc)) =
+          sum (map calc (combine db.(pset) lbc))
+          /\
+          filtered_dbpset = d1.(pset)
+          /\ (* The order is conserved, so any Forall2 preds on this still holds *)
+          (forall pred, Forall2 pred db.(pset) lbc -> Forall2 pred filtered_dbpset filtered_lbc)
+        ). {
+          (* exists (filter (fun '(b0, _) => if in_dec eq_dec b0 d1.(pset) then true else false) (combine db.(pset) lbc)).
+          repeat split.
+          - pose proof list_partition_in_notin d1.(pset) (map fst (combine db.(pset) lbc)) as H.
+            destruct H as [in_part [notin_part]].
+            destruct H as [H_comb_perm [H_in H_notin]]. *)
+            admit.
+        }
+        destruct H as [dbpset' [lbc' [H_sum_eq [H_dbpset_eq H_forall2_eq]]]].
+        pose proof H_forall2_eq _ Hlbc as Hlbc'.
+        clear H_forall2_eq.
+        rewrite <- H_sum_eq.
+        clear H_sum_eq.
+        subst dbpset'.
+        subst calc.
+        pose proof combine_permutation_l_exists_holds _ l_sum_to_bc _ H_perm_ga_d1 as H_perm.
+        destruct H_perm as [l_sum_to_bc' [H_perm_l_sum_to_bc [H_perm_combine H_forall2_l_sum_to_bc]]].
+        specialize (H_forall2_l_sum_to_bc _ H_forall2_bc).
+
+        rewrite H_perm_combine.
+        f_equal.
+        apply map_map_eq_Forall2.
+        
+        remember (fun a0 b : B * (R * Distr C) =>
+        (let
+         '(b0, y) := a0 in
+          let '(_, d) := y in (d1.(prob) b0 * d.(prob) c)%R) =
+        (let
+         '(b0, y) := b in
+          let '(_, d) := y in (ga.(prob) b0 * d.(prob) c)%R)) as pred.
+        enough (
+          forall a b c,
+          In (a, b) (combine d1.(pset) lbc') ->
+          In (a, c) (combine d1.(pset) l_sum_to_bc') ->
+          pred (a, b) (a, c)
+        ). {
+          pose proof combine_Forall2 d1.(pset) lbc' l_sum_to_bc'.
+          specialize (H0 (fun a b c => pred (a, b) (a, c))).
+          specialize (H0 H).
+          eapply Forall2_imply.
+          - apply H0.
+          - intros.
+            destruct a0, b.
+            destruct H3.
+            subst b.
+            assumption. 
+        }
+        subst pred.
+        intros b [r3 d3] [r4 d4] H_in_lbc' H_in_l_sum_to_bc'.
+        pose proof In_combine_Forall2 _ _ _ _ _ H_in_lbc' Hlbc' as Har3d3.
+        pose proof In_combine_Forall2 _ _ _ _ _ H_in_l_sum_to_bc' H_forall2_l_sum_to_bc as Har4d4.
+        simpl in Har3d3, Har4d4.
+        destruct Har3d3 as [H_r3 H_d3].
+        destruct Har4d4 as [H_r4 H_d4].
+        pose proof (h b).(legal).(Legal_unique) _ _ H_d3 H_d4 as H_unique_d3_d4.
+        destruct H_unique_d3_d4 as [H_prob_d3_d4 H_perm_d3_d4].
+        rewrite H_prob_d3_d4.
+        rewrite H_prob_ga_d1.
+        reflexivity.
     }
   }
   {
