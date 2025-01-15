@@ -1109,6 +1109,46 @@ Proof.
     reflexivity.
 Qed.
 
+(* Forall2
+               (fun '(r1, d1) '(r2, d2) =>
+                r1 = r2 /\ ProbDistr.equiv d1 d2) 
+  l1 l2 
+  holds, then sum_distr l1 ?d0 -> sum_distr l2 ?d0  
+  make it a proper instance *)              
+(* Lemma sum_distr_congr {A: Type}:
+  Proper (Forall2 (fun '(r1, d1) '(r2, d2) => r1 = r2 /\ ProbDistr.equiv d1 d2) ==> ProbDistr.equiv ==> iff) (@ProbDistr.sum_distr A).
+Proof.
+  unfold Proper, respectful.
+  intros l1 l2 Hl r1 r2 ?.
+  split; intros.
+  - destruct H0 as [Hpset Hprob]. *)
+(* Admitted. *)
+
+Lemma sum_distr_congr {A: Type}:
+  forall (l1 l2: list (R * Distr A)) (d0: Distr A),
+    Forall2 (fun '(r1, d1) '(r2, d2) => r1 = r2 /\ ProbDistr.equiv d1 d2) l1 l2 ->
+    ProbDistr.sum_distr l1 d0 <->
+    ProbDistr.sum_distr l2 d0.
+Proof.
+Admitted.
+
+Lemma sum_distr_congr_1 {A: Type}:
+  forall (l1 l2: list (R * Distr A)) (d0: Distr A),
+    Forall2 (fun '(r1, d1) '(r2, d2) => r1 = r2 /\ ProbDistr.equiv d1 d2) l1 l2 ->
+    ProbDistr.sum_distr l1 d0 ->
+    ProbDistr.sum_distr l2 d0.
+Proof.
+Admitted.
+
+Lemma sum_distr_congr_2 {A: Type}:
+  forall (l1 l2: list (R * Distr A)) (d0: Distr A),
+    Forall2 (fun '(r1, d1) '(r2, d2) => r1 = r2 /\ ProbDistr.equiv d1 d2) l1 l2 ->
+    ProbDistr.sum_distr l2 d0 ->
+    ProbDistr.sum_distr l1 d0.
+Proof.
+Admitted.
+
+
 (* permutation of ds is ok with sum_distr *)
 (* export as congr instance *)
 #[export] Instance sum_distr_perm {A: Type}:
@@ -4069,24 +4109,6 @@ Proof.
     reflexivity.
 Qed.
 
-Lemma map_fst_combine:
-  forall {A B C: Type} (l1: list A) (l2: list B),
-    map fst (combine l1 l2) = l1.
-Proof.
-Admitted.
-
-Lemma map_snd_combine:
-  forall {A B C: Type} (l1: list A) (l2: list B),
-    map snd (combine l1 l2) = l2.
-Proof.
-Admitted.
-
-Lemma map_map_common_combine:
-  forall {A B C D: Type} (l1: list A) (l2: list B) (l3: list C) (f: A * C -> D) (g: B * C -> D),
-  map f (combine l1 l3) = map g (combine l2 l3) ->
-  Forall (fun '(a, (b, c)) => f (a, c) = g (b, c)) (combine l1 (combine l2 l3)).
-Admitted.
-
 Lemma combine_permutation_l_exists_holds:
   forall {A B: Type} (l1: list A) (l2: list B)
     (l1': list A),
@@ -4607,7 +4629,105 @@ Proof.
     }
   }
   {
-    admit.
+    unfold ProbMonad.__bind.
+    intros H.
+    destruct H as [da [lac [Hda [Hlac H_sum_distr_ladc]]]].
+    set ( fg := ProbMonad.bind f g).
+    pose proof fg.(legal).(Legal_exists) as [db Hdb].
+    assert (
+      exists lbc: list (R * Distr C),
+        Forall2 (fun b '(r, d) => 
+                  r = db.(prob) b /\ 
+                  (h b).(distr) d)
+        db.(pset) lbc
+    ). {
+      clear Hlac.
+      induction db.(pset) as [|b l].
+      - exists nil.
+        repeat constructor.
+      - destruct IHl as [lbc Hlbc].
+        pose proof (h b).(legal).(Legal_exists) as [hb Hhb].
+        exists ((db.(prob) b, hb) :: lbc).
+        constructor.
+        2: {
+          apply Hlbc.
+        }
+        sets_unfold in Hhb.
+        split; auto.
+    }
+    destruct H as [lbc Hlbc].
+    exists db, lbc.
+    split.
+    {
+      sets_unfold.
+      assert (
+        exists lab: list (R * Distr B),
+          Forall2 (fun a '(r, d) => 
+                    r = da.(prob) a /\ 
+                    (g a).(distr) d)
+          da.(pset) lab
+      ). {
+        clear Hdb.
+        clear Hlac.
+        induction da.(pset) as [|a l].
+        - exists nil.
+          repeat constructor.
+        - destruct IHl as [lab Hlab].
+          pose proof (g a).(legal).(Legal_exists) as [ga Hga].
+          exists ((da.(prob) a, ga) :: lab).
+          constructor.
+          2: {
+            apply Hlab.
+          }
+          sets_unfold in Hga.
+          split; auto.
+      }
+      destruct H as [lab Hlab].
+      exists da, lab.
+      split; auto.
+      split; auto.
+      pose proof fg.(legal) as Hfg_legal.
+      unfold ProbMonad.bind in fg.
+      unfold ProbMonad.__bind in fg.
+      simpl in Hdb.
+      sets_unfold in Hdb.
+      destruct Hdb as [da' [lab' [Hda' [Hlab' H_sum_distr_lab'db]]]].
+      clear lbc Hlbc H_sum_distr_ladc.
+
+      (* da and da' has perm pset *)
+      pose proof f.(legal).(Legal_unique) _ _ Hda Hda' as H_unique_da_da'.
+      destruct H_unique_da_da' as [H_prob_da_da' H_perm_da_da'].
+      assert (da.(prob) = da'.(prob)) as H_prob_eq by (apply functional_extensionality; auto).
+      symmetry in H_perm_da_da'.
+      pose proof Forall2_perm_l_exists _ _ _ _ H_perm_da_da' Hlab' as [lab'' [H_perm_lab_lab'' H_forall2_lab'']].
+      rewrite H_perm_lab_lab'' in H_sum_distr_lab'db.
+      clear H_perm_lab_lab''.
+      clear Hlab' lab' Hda'.
+      rewrite <- H_prob_eq in H_forall2_lab''.
+
+      assert (
+        Forall2 (fun '(r1, d1) '(r2, d2) => r1 = r2 /\ ProbDistr.equiv d1 d2)
+        lab lab''
+      ) as Hlab_lab''. {
+        clear fg Hfg_legal H_prob_da_da' H_perm_da_da' H_prob_eq H_sum_distr_lab'db.
+        pose proof Forall2_pair_Forall2 _ (fun '(r1, d1) '(r2, d2) => r1 = r2 /\ ProbDistr.equiv d1 d2) _ _ _ Hlab H_forall2_lab''.
+        apply H.
+        intros.
+        destruct b1, b2.
+        destruct H3, H4.
+        split.
+        - subst.
+          reflexivity.
+        - pose proof (g a).(legal).(Legal_unique) _ _ H5 H6.
+          assumption. 
+      }
+      pose proof sum_distr_congr_2 _ _ _ Hlab_lab'' H_sum_distr_lab'db.
+      assumption.
+    }
+    split; auto.
+    {
+      admit.
+    }
   }
 Admitted. (** Level 3 *)
 
