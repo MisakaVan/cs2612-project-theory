@@ -807,6 +807,7 @@ Record legal {A: Type} (d: Distr A): Prop := {
   legal_nonneg: forall a, (d.(prob) a >= 0)%R;
   legal_pset_valid: forall a, (d.(prob) a > 0)%R -> In a d.(pset);
   legal_prob_1: sum_prob d.(pset) d.(prob) = 1%R;
+  (* legal_pset_pos: forall a, In a d.(pset) -> (d.(prob) a > 0)%R; *)
 }.
 
 Definition equiv {A: Type} (d1 d2: Distr A): Prop :=
@@ -2848,8 +2849,8 @@ Proof.
       auto.
 Qed.
 
-Lemma sum_distr_prob_nonneg:
-  forall {A: Type} (dA: Distr A) (dP: Distr Prop) (P: A -> Prop) (lP: list (R * Distr Prop)),
+Lemma sum_distr_prob_sum_nonneg:
+  forall {A: Type} (la: list A) (dA: Distr A) (dP: Distr Prop) (P: A -> Prop) (lP: list (R * Distr Prop)),
     ProbDistr.legal dA ->
     Forall2
       (fun (a : A) '(r, d0) =>
@@ -2857,19 +2858,67 @@ Lemma sum_distr_prob_nonneg:
         d0.(pset) = [P a] /\
         d0.(prob) (P a) = 1%R /\
         (forall b : Prop, P a <> b -> d0.(prob) b = 0%R))
-      dA.(pset) lP ->
+      la lP ->
+    incl la dA.(pset) ->
     ProbDistr.sum_distr lP dP ->
-    (forall a, In a dA.(pset) -> dP.(prob) (P a) >= 0)%R.
+    (forall a, (sum (map (fun '(r0, d0) => r0 * d0.(prob) (P a)) lP) >= 0)%R).
 Proof.
-  intros.
-  destruct H1 as [_ Hprob].
-  specialize (Hprob (P a)).
-  assert (forall rd, In rd lP -> (fst rd * (snd rd).(prob) (P a) >= 0)%R). {
-    intros.
-  }
-Admitted.
-
-Lemma sum_distr_prob_pos:
+  intros A la.
+  induction la as [| a1 l IH].
+  - intros.
+    pose proof Forall2_same_length _ _ _ H0 as H_same_length.
+    assert (lP = []) as H_lP_empty. {
+      apply length_zero_iff_nil.
+      simpl in H_same_length.
+      auto.
+    }
+    subst.
+    simpl.
+    lra.
+  - intros.
+    destruct lP as [| [r d] lP'].
+    + inversion H0.
+    + inversion H0.
+      subst.
+      destruct H2 as [Hpset Hprob].
+      simpl in Hprob.
+      set (dP'_pset := filter_dup (concat (map (fun '(_, d) => d.(pset)) lP'))).
+      set (dP'_prob := fun Pa => sum (map (fun '(r0, d0) => (r0 * d0.(prob) Pa)%R) lP')).
+      set (dP' := {| ProbDistr.pset := dP'_pset; ProbDistr.prob := dP'_prob; |}).
+      assert (ProbDistr.sum_distr lP' dP') as H_sum_dP'. {
+        split; auto.
+      }
+      assert (r >= 0)%R. {
+        destruct H as [? ? ? ?].
+        specialize (legal_nonneg a1).
+        assert (r = dA.(prob) a1) by apply H6.
+        lra.
+      }
+      assert (r * d.(prob) (P a1) >= 0)%R. {
+        destruct (eq_dec (P a1) (P a1)) as [Heq | Hneq].
+        - assert (d.(prob) (P a1) = 1%R) by apply H6.
+          rewrite H3.
+          lra.
+        - contradiction.
+      }
+      simpl.
+      assert (incl l dA.(pset)) as H_incl. {
+        pose proof incl_app_inv [a1] l H1 as [_ H_incl].
+        auto.
+      }
+      destruct (eq_dec (P a1) (P a)) as [Heq | Hneq].
+      * subst.
+        specialize (IH dA dP' P lP' H H8 H_incl H_sum_dP' a1).
+        rewrite <- Heq.
+        lra.
+      * specialize (IH dA dP' P lP' H H8 H_incl H_sum_dP' a).
+        assert (forall b : Prop, P a1 <> b -> d.(prob) b = 0%R) by apply H6.
+        specialize (H4 (P a) Hneq).
+        rewrite H4.
+        lra.
+Qed.
+        
+(* Lemma sum_distr_prob_nonneg:
   forall {A: Type} (dA: Distr A) (dP: Distr Prop) (P: A -> Prop) (lP: list (R * Distr Prop)),
     ProbDistr.legal dA ->
     Forall2
@@ -2880,10 +2929,10 @@ Lemma sum_distr_prob_pos:
       (forall b : Prop, P a <> b -> d0.(prob) b = 0%R))
     dA.(pset) lP ->
     ProbDistr.sum_distr lP dP ->
-    (forall a, In a dA.(pset) -> dP.(prob) (P a) > 0)%R.
+    (forall a, In a dA.(pset) -> dP.(prob) (P a) >= 0)%R.
 Proof.
   intros A dA.
-  induction dA.(pset) as [| a1 l IH] eqn:HApset.
+  induction dA.(pset) as [| a1 l IH].
   - intros.
     contradiction.
   - intros.
@@ -2899,9 +2948,10 @@ Proof.
       assert (ProbDistr.sum_distr lP' dP') as H_sum_dP'. {
         split; auto.
       }
-      assert (r > 0)%R. {
+      assert (r >= 0)%R. {
         destruct H as [? ? ? ?].
         specialize (legal_nonneg a1).
+        assert (r = dA.(prob) a1) by apply H6.
         lra.
       }
       assert (r * d.(prob) (P a) >= 0)%R. {
@@ -2924,7 +2974,8 @@ Proof.
         assert (d.(prob) (P a1) = 1%R) by apply H6.
         rewrite H2, H4 in Hprob.
         assert (sum (map (fun '(r, d) => r * d.(prob) (P a1)) lP') >= 0)%R. {
-          admit.
+          
+          apply sum_distr_prob_sum_nonneg with (dA := dA) (dP := dP') (P := P) (lP := lP'); auto.
         }
         rewrite Hprob, <- H2.
         lra.
@@ -2935,9 +2986,203 @@ Proof.
         specialize (Hprob (P a)).
         
         lra.
-  Admitted.
-    
+  Admitted. *)
 
+Lemma split_zero_and_pos_from_nonneg_list:
+  forall {A: Type} (l: list A) (f: A -> R) (r: R),
+    (forall a, In a l -> f a >= 0)%R ->
+    sum (map f l) = r ->
+    exists zero_list pos_list, Permutation l (zero_list ++ pos_list) /\
+      (forall a, In a zero_list -> f a = 0)%R /\
+      (forall a, In a pos_list -> f a > 0)%R /\ 
+      sum (map f pos_list) = r.
+Proof.
+  induction l as [| a l IH].
+  - intros.
+    exists [], [].
+    simpl.
+    repeat split.
+    + apply Permutation_refl.
+    + intros.
+      contradiction.
+    + intros.
+      contradiction.
+    + simpl in H0.
+      lra.
+  - intros.
+    assert (In a (a :: l)) by (left; auto).
+    pose proof H a H1.
+    clear H1.
+    assert (forall a : A, In a l -> (f a >= 0)%R). {
+      intros.
+      apply H.
+      right; auto.
+    }
+    destruct (Req_dec 0 (f a)).
+    + simpl in H0.
+      assert (sum (map f l) = r) by lra.
+      specialize (IH f r H1 H4) as [l0 [lpos [Hperm [Hzero [Hpos Hsum]]]]].
+      exists (a :: l0), lpos.
+      repeat split.
+      * apply (perm_skip a Hperm).
+      * intros.
+        destruct (eq_dec a a0).
+        -- subst.
+           auto.
+        -- apply Hzero.
+           destruct H5.
+            ++ subst.
+               contradiction.
+            ++ auto.
+      * intros.
+        apply Hpos.
+        auto.
+      * auto.
+    + assert (sum (map f l) = (r - f a)%R). {
+        simpl in H0.
+        lra.
+      }
+      specialize (IH f (r - f a)%R H1 H4) as [l0 [lpos [Hperm [Hzero [Hpos Hsum]]]]].
+      exists l0, (a :: lpos).
+      repeat split.
+      * apply (Permutation_cons_app l0 lpos a Hperm).
+      * intros.
+        apply Hzero.
+        auto.
+      * intros.
+        destruct H5.
+        -- subst.
+           lra.
+        -- apply Hpos.
+           auto.
+      * simpl.
+        lra.
+Qed.
+
+Lemma nonneg_sublist_sum_le:
+  forall {A: Type} (l: list A) (f: A -> R) (r: R) (subl: list A),
+    (forall a, In a l -> f a >= 0)%R ->
+    sum (map f l) = r ->
+    incl subl l ->
+    (sum (map f subl) <= r)%R.
+Admitted.
+
+Lemma nonneg_sublist_sum_ge:
+  forall {A: Type} (l: list A) (f: A -> R) (r: R) (subl: list A),
+    (forall a, In a l -> f a >= 0)%R ->
+    sum (map f subl) = r ->
+    incl subl l ->
+    (sum (map f l) >= r)%R.
+Admitted.
+
+Lemma sumup_incl:
+  forall {A: Type} (zero_list pos_list l: list A) (f: A -> R) (r: R),
+    Permutation l (zero_list ++ pos_list) ->
+    (forall a, In a zero_list -> f a = 0)%R ->
+    (forall a, In a pos_list -> f a > 0)%R ->
+    sum (map f pos_list) = r ->
+    (r >= 0)%R ->
+    (forall subl, incl subl l -> (sum (map f subl) = r)%R -> incl pos_list subl).
+Proof.
+  induction pos_list as [| a pos_list' IH].
+  - intros.
+    apply incl_nil_l.
+  - intros.
+    assert (Permutation (zero_list ++ pos_list') (zero_list ++ pos_list')) by apply Permutation_refl.
+    assert (forall a : A, In a pos_list' -> (f a > 0)%R). {
+      intros.
+      apply H1.
+      right; auto.
+    }
+    assert (sum (map f pos_list') = (r - f a)%R). {
+      simpl in H2.
+      lra.
+    }
+    assert ((r - f a >= 0)%R). {
+      rewrite <- H8.
+      clear - H7.
+      induction pos_list' as [| a' pos_list'' IH'].
+      - simpl.
+        lra.
+      - simpl.
+        assert (f a' > 0)%R. {
+          specialize (H7 a').
+          apply H7.
+          left; auto.
+        }
+        assert (forall a : A, In a pos_list'' -> (f a > 0)%R). {
+          intros.
+          apply H7.
+          right; auto.
+        }
+        specialize (IH' H0).
+        lra.
+    }
+    specialize (IH (zero_list ++ pos_list') f (r - (f a))%R H6 H0 H7 H8 H9).
+    destruct (in_dec eq_dec a subl) as [Hin | Hnotin].
+    + pose proof in_split a subl Hin as [subl1 [subl2 ?]].
+  Admitted. 
+    
+Lemma always_conseq_1:
+  forall {A: Type} (dA: Distr A) (dP: Distr Prop) (P: A -> Prop) (lP: list (R * Distr Prop)),
+    (forall a, In a dA.(pset) -> (dA.(prob) a >= 0)%R) ->
+    Forall2
+       (fun (a : A) '(r, d0) =>
+        r = dA.(prob) a /\
+        d0.(pset) = [P a] /\
+        d0.(prob) (P a) = 1%R /\
+        (forall b : Prop, P a <> b -> d0.(prob) b = 0%R)) dA.(pset) lP ->
+    ProbDistr.sum_distr lP dP ->
+    (forall pa, In pa dP.(pset) -> (dP.(prob) pa >= 0)%R).
+Proof.
+  intros A dA.
+  induction dA.(pset) as [| a1 l IH].
+  + intros.
+    pose proof Forall2_same_length _ _ _ H0 as H_same_length.
+    assert (lP = []) as H_lP_empty. {
+      apply length_zero_iff_nil.
+      simpl in H_same_length.
+      auto.
+    }
+    destruct H1 as [H1 _].
+    rewrite H_lP_empty in H1.
+    simpl in H1.
+    apply Permutation_sym in H1.
+    apply Permutation_nil in H1.
+    rewrite H1 in H2.
+    contradiction.
+  + intros.
+    destruct lP as [| [r d] lP'].
+    - inversion H0.
+    - inversion H0.
+      subst.
+      destruct H1 as [Hpset Hprob].
+      simpl in Hprob.
+      set (dP'_pset := filter_dup (concat (map (fun '(_, d) => d.(pset)) lP'))).
+      set (dP'_prob := fun Pa => sum (map (fun '(r0, d) => (r0 * d.(prob) Pa)%R) lP')).
+      set (dP' := {| ProbDistr.pset := dP'_pset; ProbDistr.prob := dP'_prob; |}).
+      assert (ProbDistr.sum_distr lP' dP') as H_sum_dP'. {
+        split; auto.
+      }
+      assert (forall a : A, In a l -> (dA.(prob) a >= 0)%R). {
+        intros.
+        apply H.
+        right; auto.
+      }
+      specialize (IH dP' P lP' H1 H8 H_sum_dP' pa).
+      assert (r = dA.(prob) a1) by apply H6.
+      assert (r >= 0)%R. {
+        assert (In a1 (a1 :: l)). {
+          left; auto.
+        }
+        specialize (H a1 H4).
+        rewrite H3.
+        auto.
+      }
+      destruct (eq_dec pa (P a1)) as [Heq | Hneq].
+      * admit.
+      * admit.
+Admitted. 
 
 Theorem Always_conseq: forall {A: Type} (P Q: A -> Prop),
   (forall a, P a -> Q a) ->
@@ -3036,52 +3281,90 @@ Proof.
   unfold ProbDistr.compute_pr in *.
   destruct H0 as [ltrueQ [HtrueQ HsumQ]].
   destruct H1 as [ltrueP [HtrueP HsumP]].
-  assert (sum (map dP.(prob) dP.(pset)) = 1%R). {
+  assert (sum (map dP.(prob) dP.(pset)) = 1%R) as HsumPset1. {
     apply sum_prob1 with (dA := dA) (dQ := dP) (Q := P) (lQ := lP); auto.
   }
-  assert 
-  (exists Qpset0 Qpsetpos, 
-    Permutation dQ.(pset) (Qpset0 ++ Qpsetpos) /\ 
-    (forall q, In q Qpset0 -> dQ.(prob) q = 0)%R /\
-    (forall q, In q Qpsetpos -> dQ.(prob) q > 0)%R) as [Qpset0 [Qpsetpos [H_perm [H_zero H_pos]]]]. {
+  assert (sum (map dQ.(prob) dQ.(pset)) = 1%R) as HsumQset1. {
+    apply sum_prob1 with (dA := dA) (dQ := dQ) (Q := Q) (lQ := lQ); auto.
+  } 
+  pose proof f.(legal).(Legal_legal) dA Hda_in_f as H_legal_f.
+  destruct H_legal_f as [_ ? _ _].
+  assert (forall a, In a dA.(pset) -> (dA.(prob) a >= 0)%R) as Hproba. {
+    intros.
+    apply legal_nonneg.
+  }
+  pose proof always_conseq_1 dA dP P lP Hproba H2 H_sum_dP as HnonnegP.
+  pose proof always_conseq_1 dA dQ Q lQ Hproba Hforall2 H_sum_distr as HnonnegQ.
+  pose proof split_zero_and_pos_from_nonneg_list dQ.(pset) dQ.(prob) 1%R HnonnegQ HsumQset1 as [lQzero [lQpos [HpermQ [HzeroQ [HposQ HsumposQ]]]]].
+  pose proof split_zero_and_pos_from_nonneg_list dP.(pset) dP.(prob) 1%R HnonnegP HsumPset1 as [lPzero [lPpos [HpermP [HzeroP [HposP HsumposP]]]]].
+
+  assert (incl lPpos ltrueP) as H_inclP. {
+    apply sumup_incl with (zero_list := lPzero) (pos_list := lPpos) (l := dP.(pset)) (f := dP.(prob)) (r := 1%R); auto.
+    + lra.
+    + apply incl_Forall_in_iff.
+      apply Forall_forall.
+      intros.
+      specialize (HtrueP x) as [? _].
+      specialize (H1 H0) as [? _].
+      assumption.
+    + destruct HsumP as [HsumP' _].
+      unfold sum_prob in HsumP'.
+      rewrite HsumP'.
+      assumption.
+  }
+  assert (forall pa, In pa lPpos -> pa) as H_postrueP. {
+    intros.
+    apply H_inclP in H0.
+    specialize (HtrueP pa) as [? _].
+    specialize (H1 H0) as [_ ?].
+    assumption.
+  }
+  assert (forall qa, In qa lQpos -> qa) as H_postrueQ. {
+    intros.
     admit.
   }
-  (* How to prove ??? *)
-  assert (forall q, In q Qpsetpos -> q). {
-    admit.
+  assert (incl lQpos ltrueQ) as H_inclQ. {
+    apply incl_Forall_in_iff.
+    apply Forall_forall.
+    intros.
+    assert (In x (lQzero ++ lQpos)). {
+      apply in_or_app.
+      right; auto.
+    }
+    apply Permutation_sym in HpermQ.
+    pose proof Permutation_in x HpermQ H1.
+    specialize (H_postrueQ x H0).
+    destruct (HtrueQ x) as [_ ?].
+    apply H4.
+    auto.
+  } 
+  assert ((sum (map dQ.(prob) ltrueQ) <= 1)%R). {
+    assert (incl ltrueQ dQ.(pset)). {
+      apply incl_Forall_in_iff.
+      apply Forall_forall.
+      intros.
+      specialize (HtrueQ x) as [? _].
+      specialize (H1 H0) as [? _].
+      assumption.
+    }
+    pose proof nonneg_sublist_sum_le dQ.(pset) dQ.(prob) 1%R ltrueQ HnonnegQ HsumQset1 H0.
+    assumption.
   }
-  assert (incl Qpsetpos ltrueQ) as H_incl. {
-    admit.
+  assert ((sum (map dQ.(prob) ltrueQ) >= 1)%R). {
+    assert (forall a : Prop, In a ltrueQ -> (dQ.(prob) a >= 0)%R). {
+      intros.
+      destruct (HtrueQ a) as [? _].
+      specialize (H3 H1) as [? _].
+      specialize (HnonnegQ a H3).
+      assumption.
+    }
+    pose proof nonneg_sublist_sum_ge ltrueQ dQ.(prob) 1%R lQpos H1 HsumposQ H_inclQ.
+    assumption.
   }
-  assert 
-  (exists ltrueQ0 ltrueQpos, 
-    Permutation ltrueQ (ltrueQ0 ++ ltrueQpos) /\ 
-    (forall q, In q ltrueQ0 -> dQ.(prob) q = 0)%R /\
-    (forall q, In q ltrueQpos -> dQ.(prob) q > 0)%R) as [ltrueQ0 [ltrueQpos [H_perm' [H_zero' H_pos']]]]. {
-    admit.    
-  }
-  assert (ltrueQpos = Qpsetpos) as H_eq. {
-    admit.
-  }
-  destruct HsumQ as [HsumQ _].
-  subst.
-  unfold sum_prob.
-  assert (map dQ.(prob) ltrueQ = map dQ.(prob) (ltrueQ0 ++ Qpsetpos))%R. {
-    admit.
-  }
-  rewrite H.
-  assert (sum (map dQ.(prob) (ltrueQ0 ++ Qpsetpos)) = sum (map dQ.(prob) ltrueQ0) + sum (map dQ.(prob) Qpsetpos))%R. {
-    admit.
-  }
-  rewrite H1.
-  assert (sum (map dQ.(prob) ltrueQ0) = 0)%R. {
-    admit.
-  }
-  assert (sum (map dQ.(prob) Qpsetpos) = 1)%R. {
-    admit.
-  }
+  destruct HsumQ as [HsumQ' _].
+  unfold sum_prob in HsumQ'.
+  rewrite <- HsumQ'.
   lra.
-  apply sum_prob1 with (dA := dA) (dQ := dQ) (Q := Q) (lQ := lQ); auto.
 Admitted.
 
 Theorem Always_bind_ret {A B: Type}:
@@ -3544,8 +3827,6 @@ Proof.
   unfold ProbMonad.equiv, ProbMonad.imply_event in *.
   sets_unfold.
   intros x y H f g H0.
-  unfold ProbMonad.__bind.
-  sets_unfold.
   pose proof (x <- x;; f x).(legal).(Legal_exists) as [dx Hdx].
   pose proof (x <- y;; g x).(legal).(Legal_exists) as [dy Hdy].
   exists dx, dy.
