@@ -967,6 +967,30 @@ Proof.
     right. assumption.
 Qed.
 
+Lemma sum_map_ge_zero:
+  forall {A: Type}
+         (l: list A)
+         (func: A -> R),
+    (forall a, In a l -> (func a >= 0)%R) ->
+    (sum (map func l) >= 0)%R.
+Proof.
+  intros.
+  induction l.
+  - simpl. lra.
+  - simpl.
+    assert (H0: (func a >= 0)%R). {
+      apply H.
+      left. reflexivity.
+    }
+    assert (H1: (sum (map func l) >= 0)%R). {
+      apply IHl.
+      intros.
+      apply H.
+      right. assumption.
+    }
+    lra.
+Qed.
+
 Lemma sum_map_sum_map:
   forall (A B: Type) (la: list A) (lb: list B) (g: B -> A -> R),
     sum (
@@ -3337,8 +3361,50 @@ Lemma nonneg_sublist_sum_le:
     (forall a, In a l -> f a >= 0)%R ->
     sum (map f l) = r ->
     incl subl l ->
+    NoDup subl ->
+    NoDup l ->
     (sum (map f subl) <= r)%R.
-Admitted.
+Proof.
+  intros.
+  pose proof list_partition_in_notin subl l as H_partition.
+  destruct H_partition as [l_in [l_notin [H_perm [H_in H_notin]]]].
+  subst r.
+  rewrite <- H_perm.
+  rewrite map_app.
+  rewrite sum_app.
+  assert (Permutation subl l_in) as H_perm_subl_l_in. {
+    unfold incl in H1.
+    apply NoDup_Permutation.
+    - assumption.
+    - eapply perm_nodup_app_l.
+      apply H_perm.
+      assumption.
+    - intros.
+      split.
+      + intros H_in_subl.
+        destruct (in_dec eq_dec x l_notin) as [H_in_notin | H_notin_notin].
+        * apply H_notin in H_in_notin.
+          contradiction.
+        * apply H1 in H_in_subl.
+          rewrite <- H_perm in H_in_subl.
+          apply in_app_or in H_in_subl.
+          destruct H_in_subl; auto; contradiction.
+      + intros H_in_l_in.
+        apply H_in; auto.
+  }
+  rewrite H_perm_subl_l_in.
+  enough (sum (map f l_notin) >= 0)%R by lra.
+  apply sum_map_ge_zero.
+  intros.
+  assert (In a l). {
+    eapply Permutation_in.
+    apply H_perm.
+    apply in_app_iff.
+    auto.
+  }
+  apply H.
+  apply H4.
+Qed.
 
 Lemma nonneg_sublist_sum_ge:
   forall {A: Type} (l: list A) (f: A -> R) (r: R) (subl: list A),
@@ -3621,6 +3687,13 @@ Proof.
       assumption.
     }
     pose proof nonneg_sublist_sum_le dQ.(pset) dQ.(prob) 1%R ltrueQ HnonnegQ HsumQset1 H0.
+    assert (NoDup ltrueQ) as HnodupQ by (destruct HsumQ; auto).
+    assert (NoDup dQ.(pset)) as HnodupQ'. {
+      destruct H_sum_distr as [Hperm_filterdup _].
+      rewrite Hperm_filterdup.
+      apply filter_dup_nodup.
+    }
+    specialize (H1 HnodupQ HnodupQ').
     assumption.
   }
   assert ((sum (map dQ.(prob) ltrueQ) >= 1)%R). {
