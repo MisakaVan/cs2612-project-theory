@@ -5694,8 +5694,93 @@ Proof.
           auto.
       }
       {
-        (* should be similar *)
-        admit.
+        intros H_c_in_lbdc.
+        pose proof In_concat_map_exists _ _ _ H_c_in_lbdc as H_c_in_lbdc_ex; clear H_c_in_lbdc.
+        destruct H_c_in_lbdc_ex as [[rc1 dc1] [H_in_lbdc1 H_in_dc1]].
+        (* dc1 is from lbc *)
+        pose proof Forall2_in_r_exists _ _ _ Hlbc _ H_in_lbdc1 as H_lbc1.
+        destruct H_lbc1 as [b1 [H_in_dbpset [_ H_dc1_hb]]].
+
+        (* db is from bind f g *)
+        assert (
+          ProbMonad.__bind f.(distr) (fun a : A => (g a).(distr)) db
+        ) as Hdb_bind. {
+          unfold ProbMonad.bind in fg.
+          subst fg.
+          simpl in Hdb.
+          auto.
+        }
+        unfold ProbMonad.__bind in Hdb_bind.
+        destruct Hdb_bind as [da1 [lab1 [Hda1 [Hlab1 H_sum_distr_lab1db]]]].
+
+        (* b is from db1, so it must be from some (g ?). *)
+        destruct H_sum_distr_lab1db as [H_perm_lab1db _].
+        rewrite H_perm_lab1db in  H_in_dbpset.
+        apply filter_dup_incl in H_in_dbpset.
+        pose proof In_concat_map_exists _ _ _ H_in_dbpset as H_in_dbpset_ex.
+        clear H_in_dbpset.
+        destruct H_in_dbpset_ex as [[rbg dbg] [H_in_lab2 H_in_dc2]].
+
+        pose proof Forall2_in_r_exists _ _ _ Hlab1 _ H_in_lab2 as H_dbg.
+        destruct H_dbg as [a1 [H_in_da1pset [_ H_dbg]]].
+
+        (* da and da' are both from f and are thus equiv. unite them first *)
+        pose proof f.(legal).(Legal_unique) _ _ Hda Hda1 as H_unique_da_da1.
+        destruct H_unique_da_da1 as [H_prob_da_da1 H_perm_da_da1].
+        assert (da.(prob) = da1.(prob)) as H_prob_eq by (apply functional_extensionality; auto).
+        clear H_prob_da_da1.
+        pose proof Forall2_perm_l_exists _ _ _ _ H_perm_da_da1 Hlac as Hlac'.
+        destruct Hlac' as [lac' [H_perm_lac_lac' Hlac']].
+        rewrite H_perm_lac_lac'.
+
+        (* as a1 is from da, now that da and da' are equiv, we know a1 is here in lac' *)
+        pose proof Forall2_in_l_exists _ _ _ Hlac' _ H_in_da1pset as H_lac'.
+        simpl in H_lac'.
+        destruct H_lac' as [[rc' dc'] [H_in_lac' [_ H_dc']]].
+        sets_unfold in H_dc'.
+        destruct H_dc' as [db' [lbc' [Hdb' [Hlbc' H_sum_to_dc']]]].
+
+        destruct H_sum_to_dc' as [H_perm_lbc' _].
+
+
+
+        (* db' and dbg are all from g a1 and are equiv *)
+
+        pose proof (g a1).(legal).(Legal_unique) _ _ H_dbg Hdb' as H_unique_db'_db1.
+        destruct H_unique_db'_db1 as [H_prob_db'_db1 H_perm_db'_db1].
+        assert (dbg.(prob) = db'.(prob)) as H_prob_eq2 by (apply functional_extensionality; auto).
+        clear H_prob_db'_db1.
+        
+        (* as b1 is from dbg, now that dbg and db' are equiv, we know b1 is in db' and thus in lbc' *)
+        assert (In b1 db'.(pset)) as H_b1_in_db'. {
+          symmetry in H_perm_db'_db1.
+          rewrite H_perm_db'_db1.
+          assumption.
+        }
+          
+        pose proof Forall2_in_l_exists _ _ _ Hlbc' _ H_b1_in_db' as H_lbc'.
+        destruct H_lbc' as [[rc'' dc''] [H_in_lbc' [_ H_dc'']]].
+
+        (* dc'' and dc1 are all from h b1 and are equiv *)
+        pose proof (h b1).(legal).(Legal_unique) _ _ H_dc'' H_dc1_hb as H_unique_dc''_dc1.
+        destruct H_unique_dc''_dc1 as [_ H_perm_dc''_dc1].
+
+        assert (In c dc1.(pset)) as H by assumption.
+
+        apply In_in_concat_map.
+        exists (rc', dc').
+        split.
+        - exact H_in_lac'.
+        - rewrite H_perm_lbc'.
+          enough (In c (concat (map (fun '(_, d) => d.(pset)) lbc'))). {
+            apply filter_dup_in_iff in H0.
+            assumption.
+          }
+          apply In_in_concat_map.
+          exists (rc'', dc'').
+          split; auto.
+          rewrite H_perm_dc''_dc1.
+          assumption.
       }
     }
     {
