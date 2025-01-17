@@ -3780,8 +3780,50 @@ Lemma nonneg_sublist_sum_ge:
     (forall a, In a l -> f a >= 0)%R ->
     sum (map f subl) = r ->
     incl subl l ->
+    NoDup subl ->
+    NoDup l ->
     (sum (map f l) >= r)%R.
-Admitted.
+Proof.
+  intros.
+  pose proof list_partition_in_notin subl l as H_partition.
+  destruct H_partition as [l_in [l_notin [H_perm [H_in H_notin]]]].
+  unfold incl in *.
+  assert (Permutation subl l_in) as H_perm_subl_l_in. {
+    apply NoDup_Permutation.
+    - assumption.
+    - eapply perm_nodup_app_l.
+      apply H_perm.
+      assumption.
+    - intros.
+      split.
+      + intros H_in_subl.
+        destruct (in_dec eq_dec x l_notin) as [H_in_notin | H_notin_notin].
+        * apply H_notin in H_in_notin.
+          contradiction.
+        * apply H1 in H_in_subl.
+          rewrite <- H_perm in H_in_subl.
+          apply in_app_or in H_in_subl.
+          destruct H_in_subl; auto; contradiction.
+      + intros H_in_l_in.
+        apply H_in; auto.
+  }
+  rewrite <- H_perm.
+  subst.
+  rewrite H_perm_subl_l_in.
+  rewrite map_app.
+  rewrite sum_app.
+  enough (sum (map f l_notin) >= 0)%R by lra.
+  apply sum_map_ge_zero.
+  intros.
+  assert (In a l). {
+    eapply Permutation_in.
+    apply H_perm.
+    apply in_app_iff.
+    auto.
+  }
+  apply H.
+  apply H4.
+Qed.
 
 Lemma sumup_incl:
   forall {A: Type} (zero_list pos_list l: list A) (f: A -> R) (r: R),
@@ -4074,6 +4116,20 @@ Proof.
       assumption.
     }
     pose proof nonneg_sublist_sum_ge ltrueQ dQ.(prob) 1%R lQpos H1 HsumposQ H_inclQ.
+    assert (NoDup lQpos) as HnodupQpos. {
+      destruct H_sum_distr as [Hperm_filterdup _].
+      assert (NoDup dQ.(pset)) as HnodupQ'. {
+        rewrite Hperm_filterdup.
+        apply filter_dup_nodup.
+      }
+      pose proof Permutation_NoDup HpermQ HnodupQ' as HnodupQ.
+      eapply nodup_app_r; eauto.
+    }
+    assert (NoDup ltrueQ) as HnoduptrueQ. {
+      destruct HsumQ.
+      assumption.
+    }
+    specialize (H3 HnodupQpos HnoduptrueQ).
     assumption.
   }
   destruct HsumQ as [HsumQ' _].
