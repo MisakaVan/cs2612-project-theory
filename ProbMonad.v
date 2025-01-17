@@ -4761,13 +4761,14 @@ Qed.
 
 Lemma combine_permutation_l_exists_holds:
   forall {A B: Type} (l1: list A) (l2: list B)
-    (l1': list A),
+    (l1': list A) pred,
+    Forall2 pred l1 l2 ->
     Permutation l1 l1' ->
     exists l2',
       Permutation l2 l2' /\
       Permutation (combine l1 l2) (combine l1' l2') /\
-      (* all the Forall2 still holds *)
-      (forall pred, Forall2 pred l1 l2 -> Forall2 pred l1' l2').
+      (* Forall2 still holds *)
+      Forall2 pred l1' l2'.
 Proof.
 Admitted.
 
@@ -5485,9 +5486,8 @@ Proof.
         clear H_sum_eq.
         subst dbpset'.
         subst calc.
-        pose proof combine_permutation_l_exists_holds _ l_sum_to_bc _ H_perm_ga_d1 as H_perm.
+        pose proof combine_permutation_l_exists_holds _ l_sum_to_bc _ _ H_forall2_bc H_perm_ga_d1 as H_perm.
         destruct H_perm as [l_sum_to_bc' [H_perm_l_sum_to_bc [H_perm_combine H_forall2_l_sum_to_bc]]].
-        specialize (H_forall2_l_sum_to_bc _ H_forall2_bc).
 
         rewrite H_perm_combine.
         f_equal.
@@ -6012,10 +6012,10 @@ Proof.
 
       (* Search combine. *)
       symmetry in H_perm_da_da_fg.
-      pose proof combine_permutation_l_exists_holds _ lab _ H_perm_da_da_fg as H_perm.
+      pose proof combine_permutation_l_exists_holds _ lab _ _ Hlab H_perm_da_da_fg as H_perm.
       destruct H_perm as [lab' [H_perm_lab_lab' [H_perm_comb_comb' H_forall2_comb_comb']]].
       rewrite H_perm_comb_comb' in H_rhs4.
-      pose proof H_forall2_comb_comb' _ Hlab as Hlab'.
+      pose proof H_forall2_comb_comb' as Hlab'.
       clear Hlab.
       clear H_perm_comb_comb'.
       clear H_forall2_comb_comb'.
