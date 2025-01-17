@@ -945,6 +945,28 @@ Proof.
     lra.
 Qed.
 
+Lemma sum_map_zero:
+  forall {A: Type}
+         (l: list A)
+         (func: A -> R),
+    (forall a, In a l -> func a = 0%R) ->
+    sum (map func l) = 0%R.
+Proof.
+  intros.
+  induction l.
+  - simpl. reflexivity.
+  - simpl.
+    rewrite H.
+    2: {
+      left. reflexivity.
+    }
+    rewrite IHl.
+    lra.
+    intros.
+    apply H.
+    right. assumption.
+Qed.
+
 Lemma sum_map_sum_map:
   forall (A B: Type) (la: list A) (lb: list B) (g: B -> A -> R),
     sum (
@@ -4771,6 +4793,140 @@ Lemma Permutation_filter_dup_concat_incl:
 Proof.
 Admitted.
 
+Lemma Forall2_app_l_break_r:
+  forall {A B: Type} (l1a l1b: list A) (l2: list B) (f: A -> B -> Prop),
+    Forall2 f (l1a ++ l1b) l2 ->
+    exists l2a l2b,
+      l2 = (l2a ++ l2b) /\
+      Forall2 f l1a l2a /\
+      Forall2 f l1b l2b.
+Proof.
+  intros.
+  revert l2 H.
+  induction l1a as [|a l1a' IH].
+  - exists [], l2.
+    simpl in H.
+    split; auto.
+  - intros.
+    destruct l2 as [|b l2'].
+    + simpl in H.
+      inversion H.
+    + simpl in H.
+      inversion H.
+      apply IH in H5.
+      destruct H5 as [l2a [l2b [Hl2 [Hl2a Hl2b]]]].
+      exists (b :: l2a), l2b.
+      split; auto.
+      rewrite Hl2.
+      simpl.
+      reflexivity.
+Qed. 
+
+Lemma list_pair_partition_l:
+  forall {A B: Type} (l1: list A) (l2: list B) (l1flag: list A),
+  forall pred, Forall2 pred l1 l2 -> 
+    exists l1t l1o l2t l2o,
+      (* the two parts hold the Forall2 *)
+      Forall2 pred l1t l2t /\
+      Forall2 pred l1o l2o /\
+      (* pairs are moved together *)
+      Permutation (combine l1 l2) ((combine l1t l2t) ++ (combine l1o l2o)) /\
+      (* partition is make with respect to l1flag *)
+      (forall a, In a l1t -> In a l1flag) /\
+      (forall a, In a l1o -> ~ In a l1flag).
+Proof.
+Admitted.
+
+(* Lemma NoDup_cons_in_dec:
+  forall {A: Type} (a: A) (l1 l2: list A),
+    NoDup (l1 ++ l2) ->
+    In a (l1 ++ l2) ->
+    {In a l1} + {In a l2}.
+Proof.
+Admitted. *)
+
+Lemma Permutation_combine_cons:
+  forall {A B: Type} {la: list A} {lb: list B} {la1 lb1 la2 lb2},
+    length la = length lb ->
+    length la1 = length lb1 ->
+    length la2 = length lb2 ->
+    Permutation (combine la lb) ((combine la1 lb1) ++ (combine la2 lb2)) ->
+    Permutation la (la1 ++ la2) /\
+    Permutation lb (lb1 ++ lb2).
+Proof.
+Admitted.
+
+Lemma combine_perm_l_exists:
+  forall {A B: Type} (l1: list A) (l2: list B) (l1': list A),
+  forall pred, 
+    Forall2 pred l1 l2 ->
+    Permutation l1 l1' ->
+    exists l2',
+      length l2 = length l2' /\
+      Permutation (combine l1 l2) (combine l1' l2') /\
+      Forall2 pred l1' l2'.
+Proof.
+Admitted.
+
+Lemma list_pair_partition_l_nodup_incl:
+  forall {A B: Type} (l1: list A) (l2: list B) (l1flag: list A),
+  NoDup l1flag ->
+  NoDup l1 ->
+  incl l1flag l1 ->
+  forall pred, Forall2 pred l1 l2 -> 
+    exists l1t l1o l2t l2o,
+    Forall2 pred l1t l2t /\
+    Forall2 pred l1o l2o /\
+    Permutation (combine l1 l2) ((combine l1t l2t) ++ (combine l1o l2o)) /\
+    l1t = l1flag /\
+    (forall a, In a l1o -> ~ In a l1flag).
+Proof.
+  intros A B l1 l2 l1flag H_nodup_l1flag H_nodup_l1 H_incl_l1flag pred H_l.
+  pose proof list_pair_partition_l l1 l2 l1flag pred H_l as H_partition.
+  destruct H_partition as [l1t [l1o [l2t [l2o H]]]].
+  destruct H as [H_t [H_o [H_perm [H_l1t H_l1o]]]].
+  pose proof F2_sl H_l as len_l.
+  pose proof F2_sl H_t as len_t.
+  pose proof F2_sl H_o as len_o.
+  pose proof Permutation_combine_cons len_l len_t len_o H_perm as H_perm_combine.
+  destruct H_perm_combine as [H_perm_l1 H_perm_l2].
+  assert (Permutation l1t l1flag) as H_perm_l1flag. {
+    apply NoDup_Permutation.
+    - eapply perm_nodup_app_l.
+      symmetry.
+      apply H_perm_l1.
+      exact H_nodup_l1.
+    - exact H_nodup_l1flag.
+    - intros a.
+      split.
+      + intros H_in.
+        apply H_l1t.
+        exact H_in.
+      + intros H_in.
+        destruct (in_dec eq_dec a l1o) as [H_in_o | H_not_in_o].
+        * exfalso.
+          apply H_l1o in H_in_o.
+          contradiction.
+        * unfold incl in H_incl_l1flag.
+          pose proof H_incl_l1flag a H_in.
+          rewrite H_perm_l1 in H.
+          apply in_app_or in H.
+          tauto.
+  }
+  (* now l1t and l1flag are Perm, substitute all l1t *)
+  pose proof combine_perm_l_exists l1t l2t l1flag _ H_t H_perm_l1flag as H_perm_combine_l1.
+  destruct H_perm_combine_l1 as [l2t' [H_len_l2t' [H_perm_l2t' H_f2_l2t']]].
+
+  exists l1flag, l1o.
+  exists l2t', l2o.
+  repeat split; auto.
+  rewrite H_perm.
+  rewrite H_perm_l2t'.
+  reflexivity.
+Qed.
+
+      
+
 
 Lemma bind_assoc:
   forall (A B C: Type)
@@ -4917,7 +5073,13 @@ Proof.
     }
     {
       intros c.
-      destruct H_sum_distr_ladb as [_ H_sum_ladb].
+      destruct H_sum_distr_ladb as [H_perm_ladb H_sum_ladb].
+      assert (NoDup db.(pset)) as H_nodup_dbpset. {
+        eapply Permutation_NoDup.
+        symmetry.
+        apply H_perm_ladb.
+        apply filter_dup_nodup.
+      }
       destruct H_sum_distr_lbdc as [_ H_sum_lbdc].
       rewrite H_sum_lbdc.
       remember (sum (map (fun '(r, d) => (r * d.(prob) c)%R) lbc)) as lhs.
@@ -4930,6 +5092,8 @@ Proof.
         subst lhs.
         f_equal.
         clear H_sum_lbdc.
+        clear H_perm_ladb.
+        clear H_nodup_dbpset.
         induction Hlbc.
         - simpl. reflexivity.
         - simpl.
@@ -4956,6 +5120,8 @@ Proof.
         clear H_sum_ladb.
         clear Hlac.
         clear Hdbprob.
+        clear H_perm_ladb.
+        clear H_nodup_dbpset.
         induction Hlab.
         - simpl. reflexivity.
         - simpl.
@@ -5195,9 +5361,17 @@ Proof.
         pose proof (g a).(legal).(Legal_unique) _ _ Hga H_d1 as H_unique_ga_d1.
         destruct H_unique_ga_d1 as [H_prob_ga_d1 H_perm_ga_d1].
 
+        assert (incl d1.(pset) db.(pset)) as H_incl_d1_dbpset. 
+        {
+          admit.
+        }
+
         (* summing db.(pset) with d1.(prob)
            is equal to summing along the d1.(pset)
            as all those b's not in d1.(pset) get a multiplier of 0.  *)
+
+        remember (fun (a : B) '(r, d) => r = db.(prob) a /\ d ∈ (h a).(distr))
+          as pred.
 
         remember (fun '(b0, y) =>
         let '(_, d) := y in (d1.(prob) b0 * d.(prob) c)%R) as calc.
@@ -5208,17 +5382,41 @@ Proof.
           /\
           filtered_dbpset = d1.(pset)
           /\ (* The order is conserved, so any Forall2 preds on this still holds *)
-          (forall pred, Forall2 pred db.(pset) lbc -> Forall2 pred filtered_dbpset filtered_lbc)
+          (Forall2 pred db.(pset) lbc -> Forall2 pred filtered_dbpset filtered_lbc)
         ). {
           (* exists (filter (fun '(b0, _) => if in_dec eq_dec b0 d1.(pset) then true else false) (combine db.(pset) lbc)).
           repeat split.
           - pose proof list_partition_in_notin d1.(pset) (map fst (combine db.(pset) lbc)) as H.
             destruct H as [in_part [notin_part]].
             destruct H as [H_comb_perm [H_in H_notin]]. *)
-            admit.
+            pose proof list_pair_partition_l_nodup_incl db.(pset) lbc d1.(pset) as H_partition.
+            assert (NoDup d1.(pset)) as H_nodup_d1 by
+              apply ((g a).(legal).(Legal_legal) _ H_d1).(legal_no_dup).
+            specialize (H_partition H_nodup_d1 H_nodup_dbpset).
+            specialize (H_partition H_incl_d1_dbpset).
+            specialize (H_partition _ Hlbc).
+            destruct H_partition as [filtered_dbpset [filteredout_dbpset H_partition]].
+            destruct H_partition as [filtered_lbc [filteredout_lbc H_partition]].
+            destruct H_partition as [Hfiltered [Hfilteredout H_partition]].
+            destruct H_partition as [H_perm_combine [H_filtered_dbpset H_filteredout_dbpset]].
+
+            exists filtered_dbpset, filtered_lbc.
+            repeat split; auto.
+            rewrite H_perm_combine.
+            rewrite map_app.
+            rewrite sum_app.
+            enough (sum (map calc (combine filteredout_dbpset filteredout_lbc))=0)%R by lra.
+            apply sum_map_zero.
+            intros [b [r d]] H_in_filteredout.
+            subst calc.
+            pose proof in_combine_l _ _ _ _ H_in_filteredout as H_in_filterd_out.
+            pose proof H_filteredout_dbpset _ H_in_filterd_out as H_notin_d1.
+            pose proof not_in_pset_prob_0 _ _ ((g a).(legal).(Legal_legal) _ H_d1) H_notin_d1 as H_prob_0.
+            rewrite H_prob_0.
+            lra.
         }
         destruct H as [dbpset' [lbc' [H_sum_eq [H_dbpset_eq H_forall2_eq]]]].
-        pose proof H_forall2_eq _ Hlbc as Hlbc'.
+        pose proof H_forall2_eq Hlbc as Hlbc'.
         clear H_forall2_eq.
         rewrite <- H_sum_eq.
         clear H_sum_eq.
@@ -5231,7 +5429,7 @@ Proof.
         rewrite H_perm_combine.
         f_equal.
         apply map_map_eq_Forall2.
-        
+        subst pred.
         remember (fun a0 b : B * (R * Distr C) =>
         (let
          '(b0, y) := a0 in
@@ -5545,7 +5743,13 @@ Proof.
       }
       destruct Hdb_bind as [da_fg [lab [Hs1 [Hlab H_sum_lab_db]]]].
       clear Hdb.
-      destruct H_sum_lab_db as [_ H_prob_db].
+      destruct H_sum_lab_db as [H_perm_db H_prob_db].
+      assert (NoDup db.(pset)) as H_db_nodup. {
+        eapply Permutation_NoDup.
+        symmetry. apply H_perm_db.
+        apply filter_dup_nodup.
+      }
+      clear H_perm_db.
       assert (db.(prob) = fun b => sum (map (fun '(r, d) => (r * d.(prob) b)%R) lab)) 
         as H_prob_db_eq
         by (apply functional_extensionality; auto).
@@ -5756,6 +5960,13 @@ Proof.
       rewrite H_prob_eq.
       clear H_prob_eq.
 
+
+      assert (
+        incl db'.(pset) db.(pset)
+      ) as H_db'_incl_db. {
+        admit.
+      }
+
       (* similar as the above case,
         now db is bind f g and db' is from (g a).
         so the db.(pset) is a superset of db'.(pset)
@@ -5766,6 +5977,8 @@ Proof.
       let
       '(_, d) := y in
        (da_fg.(prob) a * db'.(prob) b0 * d.(prob) c)%R) as calc.
+
+      remember (fun (b : B) '(r, d) => r = db.(prob) b /\ (h b).(distr) d) as pred.
       assert (
         exists filtered_dbpset filtered_lbc,
         sum (map calc (combine filtered_dbpset filtered_lbc)) =
@@ -5773,18 +5986,46 @@ Proof.
         /\ (* All that are left is from d2.(pset). maybe can be replaced by a looser condition (Permutation).  *)
         filtered_dbpset = db'.(pset)
         /\ (* The order is conserved, so any Forall2 preds on this still holds *)
-        (forall pred, Forall2 pred db.(pset) lbc -> Forall2 pred filtered_dbpset filtered_lbc)
+        (Forall2 pred db.(pset) lbc -> Forall2 pred filtered_dbpset filtered_lbc)
       ). {
-        admit.
+        pose proof list_pair_partition_l_nodup_incl db.(pset) lbc as H.
+        specialize (H db'.(pset)).
+        assert (NoDup db'.(pset)) as H_db'_nodup by
+          (apply ((g a).(legal).(Legal_legal) _ Hdb').(legal_no_dup)).
+        specialize (H H_db'_nodup); clear H_db'_nodup.
+        specialize (H H_db_nodup).
+        specialize (H H_db'_incl_db).
+        specialize (H _ Hlbc).
+        destruct H as [filtered_dbpset [filteredout_dbpset [filtered_lbc [filteredout_lbc H]]]].
+        destruct H as [H_filtered [H_filteredout H]].
+        destruct H as [H_perm_combine [H_filtered_dbpset H_filteredout_dbpset]].
+
+        exists filtered_dbpset, filtered_lbc.
+        repeat split.
+        all: auto.
+        rewrite H_perm_combine.
+        rewrite map_app.
+        rewrite sum_app.
+        enough (sum (map calc (combine filteredout_dbpset filteredout_lbc)) = 0)%R by lra.
+        apply sum_map_zero.
+        intros [b0 [r d]] H_in_filteredout.
+        subst calc.
+        apply in_combine_l in H_in_filteredout.
+        pose proof H_filteredout_dbpset _ H_in_filteredout as H_notin_dbpset.
+        pose proof (g a).(legal).(Legal_legal) _ Hdb' as H_db'_legal.
+        pose proof not_in_pset_prob_0 _ _ H_db'_legal H_notin_dbpset.
+        rewrite H.
+        lra.
       }
       destruct H as [filtered_dbpset [filtered_lbc [H_sum_eq [H_dbpset_eq H_forall2_eq]]]].
-      pose proof H_forall2_eq _ Hlbc as Hlbc''; clear H_forall2_eq.
+      pose proof H_forall2_eq Hlbc as Hlbc''; clear H_forall2_eq.
       rewrite <- H_sum_eq.
       clear H_sum_eq.
       subst calc.
       f_equal.
       subst filtered_dbpset.
       apply map_map_eq_Forall2.
+      subst pred.
       remember (fun a0 b : B * (R * Distr C) =>
       (let
        '(b0, y) := a0 in
@@ -6044,27 +6285,6 @@ Proof.
   split; auto.
 Qed.
 
-Lemma sum_map_zero:
-  forall {A: Type}
-         (l: list A)
-         (func: A -> R),
-    (forall a, In a l -> func a = 0%R) ->
-    sum (map func l) = 0%R.
-Proof.
-  intros.
-  induction l.
-  - simpl. reflexivity.
-  - simpl.
-    rewrite H.
-    2: {
-      left. reflexivity.
-    }
-    rewrite IHl.
-    lra.
-    intros.
-    apply H.
-    right. assumption.
-Qed.
 
 Lemma concat_map_singleton:
   forall {A: Type}
