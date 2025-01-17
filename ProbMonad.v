@@ -5781,7 +5781,25 @@ Lemma bind_ret_l_event:
          (a: A)
          (f: A -> ProbMonad.M Prop),
   ProbMonad.equiv_event (bind (ret a) f) (f a).
-Admitted. (** Level 3 *)
+Proof.
+  intros.
+  unfold ProbMonad.equiv_event.
+  remember (bind (ret a) f) as bind_ret_f.
+  remember (f a) as f_a.
+  pose proof bind_ret_l _ _ a f as H_bind_ret_l.
+  unfold ProbMonad.equiv in H_bind_ret_l.
+  sets_unfold in H_bind_ret_l.
+  pose proof bind_ret_f.(legal).(Legal_exists) as [d Hd].
+  exists d, d.
+  repeat split.
+  - auto.
+  - specialize (H_bind_ret_l d).
+    destruct H_bind_ret_l as [? _].
+    subst.
+    apply H.
+    assumption.
+  - reflexivity.
+Qed.
 
 Lemma bind_ret_r:
   forall (A: Type)
