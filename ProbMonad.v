@@ -5654,12 +5654,127 @@ Proof.
   - reflexivity.
 Qed. 
 
+Lemma Forall2_singleton_l:
+  forall {A B: Type}
+         (pred: A -> B -> Prop)
+         (lb: list B)
+         (a: A),
+         Forall2 pred [a] lb -> 
+          exists b, lb = [b] /\ pred a b.
+Proof.
+  intros.
+  destruct lb.
+  - inversion H.
+  - inversion H.
+    assert (
+      lb = nil
+    ). {
+      inversion H5.
+      reflexivity.
+    }
+    subst.
+    exists b.
+    split; auto.
+Qed.
+
+Lemma ProbDistr_sum_distr_singleton:
+  forall (A: Type)
+         (d: Distr A),
+  ProbDistr.legal d ->
+  ProbDistr.sum_distr [(1%R, d)] d.
+Proof.
+  intros.
+  destruct H.
+  split.
+  - simpl.
+    rewrite app_nil_r.
+    apply nodup_perm_filter_dup.
+    assumption.
+  - intros a.
+    simpl.
+    lra.
+Qed.
+
 Lemma bind_ret_l:
   forall (A B: Type)
          (a: A)
          (f: A -> ProbMonad.M B),
   bind (ret a) f == f a.
-Admitted. (** Level 3 *)
+Proof.
+  intros.
+  unfold ProbMonad.equiv; sets_unfold.
+  intros db.
+  split.
+  {
+    intros Hdb.
+    unfold bind in *.
+    simpl in *.
+    unfold ProbMonad.__bind in Hdb.
+    destruct Hdb as [da [lab [Hda [Hlab H_sum_lab_db]]]].
+    unfold ProbMonad.__ret in Hda.
+    sets_unfold in Hda.
+    unfold ProbDistr.is_det in Hda.
+    destruct Hda as [H_da_singleton [H_da_prob_1 H_da_prob_0]].
+    rewrite H_da_singleton in Hlab.
+    apply Forall2_singleton_l in Hlab.
+    destruct Hlab as [[r db'] [H_lab_singleton H_lab_b]].
+    destruct H_lab_b as [H_lab_b H_db'].
+
+    destruct H_sum_lab_db as [H_perm_lab_db H_prob_db].
+    subst lab; simpl in *.
+    enough (ProbDistr.equiv db db'). {
+      pose proof (f a).(legal).(Legal_congr) as H_congr.
+      eapply H_congr.
+      - symmetry; apply H.
+      - assumption. 
+    }
+    split.
+    - intros b.
+      rewrite H_lab_b in H_prob_db.
+      rewrite H_da_prob_1 in H_prob_db.
+      rewrite H_prob_db.
+      lra.
+    - pose proof (f a).(legal).(Legal_legal) _ H_db' as H_legal.
+      destruct H_legal.
+
+      Search filter_dup.
+      rewrite H_perm_lab_db.
+      rewrite app_nil_r.
+      pose proof nodup_perm_filter_dup _ legal_no_dup.
+      symmetry; apply H.
+  }
+  {
+    intros Hdb.
+    unfold bind in *.
+    simpl in *.
+    unfold ProbMonad.__bind.
+    unfold ProbMonad.__ret.
+    sets_unfold.
+    pose proof (ret a).(legal) as H_ret_a_legal.
+    destruct H_ret_a_legal.
+    destruct Legal_exists as [da Hda].
+    exists da, [(1%R, db)].
+    split.
+    - assumption.
+    - split.
+      2: {
+        apply ProbDistr_sum_distr_singleton.
+        apply ((f a).(legal).(Legal_legal)).
+        assumption.
+      }
+      unfold ret in Hda.
+      simpl in Hda.
+      sets_unfold in Hda.
+      unfold ProbMonad.__ret in Hda.
+      unfold ProbDistr.is_det in Hda.
+      destruct Hda as [Hda_singleton [Hda_prob_1 Hda_prob_0]].
+      rewrite Hda_singleton.
+      constructor; [| simpl; auto].
+      split.
+      + symmetry; assumption.
+      + assumption.
+  }
+Qed.
 
 Lemma bind_ret_l_event:
   forall (A: Type)
