@@ -494,6 +494,23 @@ Proof.
     tauto.
 Qed.
 
+Lemma perm_filter_dup_incl_inv{A: Type}:
+  forall (l1 l2: list A),
+    Permutation (filter_dup l1) (filter_dup l2) ->
+    (forall x, In x l1 <-> In x l2).
+Proof.
+  intros.
+  split; intros.
+  - apply filter_dup_in.
+    rewrite <- H.
+    apply filter_dup_in_inv.
+    auto.
+  - apply filter_dup_in.
+    rewrite H.
+    apply filter_dup_in_inv.
+    auto.
+Qed.
+
 Lemma nodup_perm_filter_dup {A: Type}:
   forall (l: list A),
     NoDup l ->
@@ -1211,14 +1228,125 @@ Proof.
     reflexivity.
 Qed.
 
+Definition perm_filter_dup {A: Type} (l1 l2: list A): Prop :=
+  Permutation (filter_dup l1) (filter_dup l2).
 
-Lemma sum_distr_congr {A: Type}:
-  forall (l1 l2: list (R * Distr A)) (d0: Distr A),
-    Forall2 (fun '(r1, d1) '(r2, d2) => r1 = r2 /\ ProbDistr.equiv d1 d2) l1 l2 ->
-    ProbDistr.sum_distr l1 d0 <->
-    ProbDistr.sum_distr l2 d0.
+#[export] Instance eq_perm_filter_dup {A: Type}:
+  Equivalence (@perm_filter_dup A).
+Proof.
+  unfold perm_filter_dup.
+  apply equiv_in_domain.
+  split.
+  - unfold Reflexive.
+    reflexivity.
+  - unfold Symmetric.
+    symmetry; auto.
+  - unfold Transitive.
+    intros.
+    transitivity y.
+    all: auto.
+Qed.
+
+Lemma perm_filter_dup_app_comm {A: Type}:
+  forall (l1 l2: list A),
+    perm_filter_dup (l1 ++ l2) (l2 ++ l1).
 Proof.
 Admitted.
+
+Lemma perm_filter_dup_app_perm_l:
+  forall {A: Type} (l1 l2 l0: list A),
+    Permutation l1 l2 ->
+    perm_filter_dup (l1 ++ l0) (l2 ++ l0).
+Proof.
+Admitted.
+
+Lemma perm_filter_dup_app_perm_r:
+  forall {A: Type} (l1 l2 l0: list A),
+    Permutation l1 l2 ->
+    perm_filter_dup (l0 ++ l1) (l0 ++ l2).
+Proof.
+  intros.
+  transitivity (l1 ++ l0).
+  apply perm_filter_dup_app_comm.
+  transitivity (l2 ++ l0).
+  apply perm_filter_dup_app_perm_l; auto.
+  apply perm_filter_dup_app_comm.
+Qed.
+
+Lemma filter_dup_twice:
+  forall {A: Type} (l: list A),
+    Permutation (filter_dup (filter_dup l)) (filter_dup l).
+Proof.
+  intros.
+  apply perm_filter_dup_incl.
+  intros.
+  symmetry.
+  apply filter_dup_in_iff.
+Qed.
+
+Lemma perm_filter_dup_app_filter_dup_r:
+  forall {A: Type} (l1 l2: list A),
+    perm_filter_dup (l1 ++ l2) (l1 ++ filter_dup l2).
+Proof.
+  intros.
+  induction l1 as [| a l1 IH].
+  - simpl.
+    unfold perm_filter_dup.
+    symmetry.
+    apply filter_dup_twice.
+  - simpl.
+    unfold perm_filter_dup in *.
+    pose proof perm_filter_dup_incl_inv _ _ IH as IH0.
+    apply perm_filter_dup_incl.
+    intros.
+    split.
+    + intros.
+      simpl in H.
+      destruct H.
+      * subst.
+        left.
+        reflexivity.
+      * right.
+        apply IH0.
+        auto.
+    + intros.
+      simpl.
+      destruct H.
+      * subst.
+        left.
+        reflexivity.
+      * right.
+        apply IH0.
+        auto.
+Qed.
+
+(* 
+  Permutation (filter_dup (concat l1)) (filter_dup (concat l2))
+  holds if l1 and l2 satisfy the following condition:
+  Forall2 (fun lx ly => Permutation lx ly) l1 l2.
+*)
+Lemma Permutation_filter_dup_concat_congr {A: Type}:
+  forall (l1 l2: list (list A)),
+    Forall2 (fun a b => Permutation a b) l1 l2 ->
+    perm_filter_dup (concat l1) (concat l2).
+Proof.
+  intros.
+  induction H.
+  - simpl.
+    reflexivity.
+  - simpl.
+    transitivity (y ++ concat l).
+    apply perm_filter_dup_app_perm_l; auto.
+    transitivity (y ++ filter_dup (concat l)).
+    apply perm_filter_dup_app_filter_dup_r.
+    symmetry.
+    transitivity (y ++ filter_dup (concat l')).
+    apply perm_filter_dup_app_filter_dup_r.
+    apply perm_filter_dup_app_perm_r.
+    unfold perm_filter_dup in IHForall2.
+    symmetry.
+    apply IHForall2.
+Qed.
 
 Lemma sum_distr_congr_1 {A: Type}:
   forall (l1 l2: list (R * Distr A)) (d0: Distr A),
@@ -1226,7 +1354,47 @@ Lemma sum_distr_congr_1 {A: Type}:
     ProbDistr.sum_distr l1 d0 ->
     ProbDistr.sum_distr l2 d0.
 Proof.
-Admitted.
+  intros l1 l2 d H Hl1.
+  split.
+  {
+    destruct Hl1 as [Hl1 _].
+    rewrite Hl1.
+    clear Hl1.
+    remember (fun '(_, d0) => d0.(pset)) as func.
+    enough (perm_filter_dup (concat (map func l1)) (concat (map func l2))). {
+      unfold perm_filter_dup in *.
+      auto.
+    }
+    apply Permutation_filter_dup_concat_congr.
+    induction H as [| [r1 d1] [r2 d2] l1 l2 H IH].
+    - simpl.
+      constructor.
+    - simpl.
+      constructor.
+      + destruct H.
+        subst.
+        destruct H0; auto.
+      + apply IHIH.
+  }
+  {
+    intros a.
+    destruct Hl1 as [_ Hl1].
+    rewrite Hl1.
+    f_equal.
+    clear Hl1.
+    induction H as [| [r1 d1] [r2 d2] l1 l2 H IH].
+    - simpl.
+      reflexivity.
+    - simpl.
+      f_equal.
+      + destruct H.
+        destruct H0.
+        subst.
+        rewrite H0.
+        reflexivity.
+      + apply IHIH.
+  }
+Qed.
 
 Lemma sum_distr_congr_2 {A: Type}:
   forall (l1 l2: list (R * Distr A)) (d0: Distr A),
@@ -1234,8 +1402,32 @@ Lemma sum_distr_congr_2 {A: Type}:
     ProbDistr.sum_distr l2 d0 ->
     ProbDistr.sum_distr l1 d0.
 Proof.
-Admitted.
+  intros l1 l2 d H Hl2.
+  eapply sum_distr_congr_1; eauto.
+  clear Hl2.
+  induction H.
+  - constructor.
+  - constructor.
+    + destruct x, y; simpl.
+      destruct H.
+      split; auto.
+      destruct H1; split; auto.
+      symmetry; auto.
+    + apply IHForall2.
+Qed.
 
+
+Lemma sum_distr_congr {A: Type}:
+  forall (l1 l2: list (R * Distr A)) (d0: Distr A),
+    Forall2 (fun '(r1, d1) '(r2, d2) => r1 = r2 /\ ProbDistr.equiv d1 d2) l1 l2 ->
+    ProbDistr.sum_distr l1 d0 <->
+    ProbDistr.sum_distr l2 d0.
+Proof.
+  intros.
+  split.
+  - apply sum_distr_congr_1; auto.
+  - apply sum_distr_congr_2; auto.
+Qed.
 
 (* permutation of ds is ok with sum_distr *)
 (* export as congr instance *)
