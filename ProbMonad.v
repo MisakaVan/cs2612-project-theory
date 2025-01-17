@@ -1089,6 +1089,33 @@ Proof.
     lra.
 Qed.
 
+Lemma sum_perm:
+  forall (l1 l2: list R),
+    Permutation l1 l2 ->
+    sum l1 = sum l2.
+Proof.
+  intros.
+  induction H.
+  - reflexivity.
+  - simpl.
+    rewrite IHPermutation.
+    reflexivity.
+  - simpl.
+    lra.
+  - rewrite IHPermutation1.
+    rewrite IHPermutation2.
+    reflexivity.
+Qed.
+
+#[export] Instance sum_congr:
+  Proper (Permutation (A:=R) ==> eq) sum.
+Proof.
+  unfold Proper, respectful.
+  intros.
+  apply sum_perm.
+  auto.
+Qed.
+
 Module ProbDistr.
 
 Record Distr (A: Type): Type := {
@@ -1247,18 +1274,55 @@ Proof.
     all: auto.
 Qed.
 
-Lemma perm_filter_dup_app_comm {A: Type}:
+Lemma perm_filter_dup_perm {A: Type}:
+  forall (l1 l2: list A),
+    Permutation l1 l2 ->
+    perm_filter_dup l1 l2.
+Proof.
+  intros.
+  apply perm_filter_dup_incl.
+  intros.
+  split; eapply Permutation_in; [| symmetry]; auto.
+Qed.
+
+Lemma perm_filter_dup_app_sym {A: Type}:
   forall (l1 l2: list A),
     perm_filter_dup (l1 ++ l2) (l2 ++ l1).
 Proof.
-Admitted.
+  intros.
+  enough (Permutation (l1 ++ l2) (l2 ++ l1)). {
+    apply perm_filter_dup_perm.
+    auto.
+  }
+  apply Permutation_app_comm.
+Qed.
+
+Lemma perm_filter_dup_app_comm {A: Type}:
+  forall (l1 l2 l3: list A),
+    perm_filter_dup (l1 ++ l2 ++ l3) ((l1 ++ l2) ++ l3).
+Proof.
+  intros.
+  enough (Permutation (l1 ++ l2 ++ l3) ((l1 ++ l2) ++ l3)). {
+    apply perm_filter_dup_perm.
+    auto.
+  }
+  rewrite app_assoc.
+  reflexivity.
+Qed.
 
 Lemma perm_filter_dup_app_perm_l:
   forall {A: Type} (l1 l2 l0: list A),
     Permutation l1 l2 ->
     perm_filter_dup (l1 ++ l0) (l2 ++ l0).
 Proof.
-Admitted.
+  intros.
+  enough (Permutation (l1 ++ l0) (l2 ++ l0)). {
+    apply perm_filter_dup_perm.
+    auto.
+  }
+  apply Permutation_app_tail.
+  auto.
+Qed.
 
 Lemma perm_filter_dup_app_perm_r:
   forall {A: Type} (l1 l2 l0: list A),
@@ -1267,10 +1331,10 @@ Lemma perm_filter_dup_app_perm_r:
 Proof.
   intros.
   transitivity (l1 ++ l0).
-  apply perm_filter_dup_app_comm.
+  apply perm_filter_dup_app_sym.
   transitivity (l2 ++ l0).
   apply perm_filter_dup_app_perm_l; auto.
-  apply perm_filter_dup_app_comm.
+  apply perm_filter_dup_app_sym.
 Qed.
 
 Lemma filter_dup_twice:
@@ -1429,6 +1493,37 @@ Proof.
   - apply sum_distr_congr_2; auto.
 Qed.
 
+Lemma perm_filter_dup_concat_perm:
+  forall {A: Type} (l1 l2: list (list A)),
+    Permutation l1 l2 ->
+    perm_filter_dup (concat l1) (concat l2).
+Proof.
+  intros.
+  induction H.
+  - simpl.
+    reflexivity.
+  - simpl.
+    transitivity (x ++ filter_dup (concat l)).
+    apply perm_filter_dup_app_filter_dup_r.
+    symmetry.
+    transitivity (x ++ filter_dup (concat l')).
+    apply perm_filter_dup_app_filter_dup_r.
+    apply perm_filter_dup_app_perm_r.
+    symmetry.
+    apply IHPermutation.
+  - simpl.
+    rewrite perm_filter_dup_app_comm.
+    rewrite perm_filter_dup_app_comm at 1.
+    transitivity ((y ++ x) ++ filter_dup (concat l)).
+    apply perm_filter_dup_app_filter_dup_r.
+    transitivity ((x ++ y) ++ filter_dup (concat l)).
+    2: symmetry; apply perm_filter_dup_app_filter_dup_r.
+    apply perm_filter_dup_app_perm_l.
+    apply Permutation_app_comm.
+  - transitivity (concat l').
+    all: auto.
+Qed.
+
 (* permutation of ds is ok with sum_distr *)
 (* export as congr instance *)
 #[export] Instance sum_distr_perm {A: Type}:
@@ -1436,7 +1531,49 @@ Qed.
 Proof.
   unfold Proper, respectful.
   intros.
-Admitted.
+  subst.
+  split; intros.
+  - destruct H0.
+    split.
+    {
+      clear sum_prob_valid.
+      rewrite sum_pset_valid.
+      clear sum_pset_valid.
+      apply perm_filter_dup_concat_perm.
+      apply Permutation_map.
+      apply H.
+    }
+    {
+      clear sum_pset_valid.
+      intros.
+      rewrite sum_prob_valid.
+      clear sum_prob_valid.
+      apply sum_perm.
+      apply Permutation_map.
+      apply H.
+    }
+  - destruct H0.
+    split.
+    {
+      clear sum_prob_valid.
+      rewrite sum_pset_valid.
+      clear sum_pset_valid.
+      apply perm_filter_dup_concat_perm.
+      apply Permutation_map.
+      symmetry.
+      apply H.
+    }
+    {
+      clear sum_pset_valid.
+      intros.
+      rewrite sum_prob_valid.
+      clear sum_prob_valid.
+      apply sum_perm.
+      apply Permutation_map.
+      symmetry.
+      apply H.
+    }
+Qed.
 
 
 Lemma incl_nodup_perm:
