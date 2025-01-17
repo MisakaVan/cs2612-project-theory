@@ -5363,7 +5363,19 @@ Proof.
 
         assert (incl d1.(pset) db.(pset)) as H_incl_d1_dbpset. 
         {
-          admit.
+          unfold incl.
+          intros b H_in_d1.
+          rewrite H_perm_ladb.
+          enough (In b (concat (map (fun '(_, d) => d.(pset)) lab))). {
+            pose proof filter_dup_incl (concat (map (fun '(_, d) => d.(pset)) lab)) b.
+            tauto.
+          }
+          apply In_in_concat_map.
+          exists (r1, d1).
+          split.
+          - pose proof in_combine_r _ _ _ _ H_in_lab as H_in_lab'.
+            assumption.
+          - assumption. 
         }
 
         (* summing db.(pset) with d1.(prob)
@@ -5749,7 +5761,6 @@ Proof.
         symmetry. apply H_perm_db.
         apply filter_dup_nodup.
       }
-      clear H_perm_db.
       assert (db.(prob) = fun b => sum (map (fun '(r, d) => (r * d.(prob) b)%R) lab)) 
         as H_prob_db_eq
         by (apply functional_extensionality; auto).
@@ -5775,6 +5786,7 @@ Proof.
         intros [b [r d]].
         f_equal.
         f_equal.
+        clear H_perm_db.
         induction Hlab.
         - simpl. reflexivity.
         - simpl.
@@ -5870,7 +5882,7 @@ Proof.
       pose proof H_forall2_comb_comb' _ Hlab as Hlab'.
       clear Hlab.
       clear H_perm_comb_comb'.
-      clear lab H_perm_lab_lab' H_forall2_comb_comb'.
+      clear H_forall2_comb_comb'.
 
 
       subst lhs.
@@ -5964,8 +5976,23 @@ Proof.
       assert (
         incl db'.(pset) db.(pset)
       ) as H_db'_incl_db. {
-        admit.
+        unfold incl.
+        intros b H_in_db'.
+        rewrite H_perm_db.
+        enough (In b (concat (map (fun '(_, d) => d.(pset)) lab))). {
+          apply filter_dup_incl in H.
+          assumption.
+        }
+        apply In_in_concat_map.
+        exists (r2, d2).
+        rewrite H_perm_lab_lab'.
+        split.
+        - pose proof in_combine_r _ _ _ _ H_in_lab' as H_in_lab''.
+          assumption.
+        - rewrite H_perm_d2_db'.
+          assumption.
       }
+      clear H_perm_lab_lab'.
 
       (* similar as the above case,
         now db is bind f g and db' is from (g a).
