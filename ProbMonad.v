@@ -1095,6 +1095,52 @@ Notation "x '.(legal_prob_1)'" := (ProbDistr.legal_prob_1 _ x) (at level 1).
 
 (* Lemmas *)
 
+Lemma not_in_pset_prob_0:
+  forall {A: Type} (d: Distr A) (a: A),
+    ProbDistr.legal d ->
+    ~ In a d.(pset) ->
+    d.(prob) a = 0%R.
+Proof.
+  intros.
+  destruct H.
+  destruct (Rge_dec (d.(prob) a) 0).
+  - destruct (Rle_dec (d.(prob) a) 0).
+    + lra.
+    + exfalso.
+      assert (d.(prob) a > 0)%R by lra.
+      pose proof legal_pset_valid a H.
+      contradiction.
+  - exfalso.
+    pose proof legal_nonneg a.
+    contradiction.
+Qed.
+
+Definition make_det {A: Type} (a: A): Distr A :=
+  {| ProbDistr.prob := fun a' => if eq_dec a a' then 1%R else 0%R;
+     ProbDistr.pset := [a] |}.
+
+Lemma make_det_is_det:
+  forall {A: Type} (a: A),
+    ProbDistr.is_det a (make_det a).
+Proof.
+  intros.
+  unfold ProbDistr.is_det.
+  split.
+  - simpl.
+    reflexivity.
+  - split.
+    + simpl.
+      destruct (eq_dec a a).
+      reflexivity.
+      contradiction.
+    + intros.
+      simpl.
+      destruct (eq_dec a b).
+      * subst.
+        contradiction.
+      * reflexivity.
+Qed.
+
 Lemma sum_distr_exists:
   forall {A: Type} (ds: list (R * Distr A)),
     exists d0, ProbDistr.sum_distr ds d0.
@@ -1217,6 +1263,82 @@ Proof.
 Qed.
 
 
+Lemma NoDup_partition_singleton:
+  forall {A: Type} (l: list A) (a: A),
+    NoDup l ->
+    In a l ->
+    exists l', 
+      Permutation l ([a] ++ l') /\
+      ~ In a l'.
+Proof.
+  intros.
+  pose proof list_partition_in_notin [a] l as [t1 [t2 [? [? ?]]]].
+  exists t2.
+  pose proof perm_nodup_app_l _ _ _ H1 H.
+  pose proof perm_nodup_app_r _ _ _ H1 H.
+  assert (t1 = [a]). {
+    simpl in *.
+    assert (forall a1, In a1 t1 -> a1 = a). {
+      intros; pose proof H2 a1 H6.
+      destruct H7; auto.
+      contradiction.
+    }
+    destruct t1 as [| a1 t1].
+    - (* if t1 is nil, then a must be in t2, which contradicts *) 
+      exfalso.
+      simpl in H1.
+      rewrite <- H1 in H0.
+      pose proof H3 _ H0.
+      absurd (~ (a = a \/ False)).
+      {
+        auto.
+      }
+      assumption.
+    - enough (a1 = a /\ t1 = []) as Ht. {
+        destruct Ht.
+        subst.
+        reflexivity.
+      }
+      assert (a1 = a). {
+        pose proof H2 a1 (in_eq a1 t1) as Ht1.
+        destruct Ht1; auto.
+        contradiction.
+      }
+      split; auto.
+      subst.
+      (* NoDup a::t1, so t1 does not contain a *)
+      pose proof NoDup_cons_iff a t1 as [? _].
+      specialize (H7 H4).
+      destruct H7 as [? ?].
+      destruct t1 as [| a2 t1].
+      + reflexivity.
+      + exfalso.
+        pose proof H6 a2.
+        assert (In a2 (a :: a2 :: t1)). {
+          simpl.
+          right; left; auto.
+        }
+        specialize (H9 H10).
+        subst.
+        absurd (~ In a (a :: t1)). {
+          simpl.
+          auto.
+        }
+        assumption.
+  }
+  subst.
+  split.
+  - rewrite H1.
+    reflexivity.
+  - assert (NoDup ([a] ++ t2)) as Ht2. {
+      rewrite <- H1 in H.
+      assumption.
+    }
+    simpl in Ht2.
+    pose proof NoDup_cons_iff a t2 as [? _].
+    specialize (H6 Ht2).
+    tauto.
+Qed.
 
 
 #[export] Instance sum_congr :
@@ -5737,7 +5859,7 @@ Proof.
     - pose proof (f a).(legal).(Legal_legal) _ H_db' as H_legal.
       destruct H_legal.
 
-      Search filter_dup.
+      (* Search filter_dup. *)
       rewrite H_perm_lab_db.
       rewrite app_nil_r.
       pose proof nodup_perm_filter_dup _ legal_no_dup.
@@ -5801,9 +5923,296 @@ Proof.
   - reflexivity.
 Qed.
 
+(* 
+  if the Forall2's pred is strong enough to imply the mapped func,
+  
+*)
+Lemma Forall2_map_r:
+  forall {A B C: Type}
+         {pred: A -> B -> Prop}
+         {la: list A} {lb: list B}
+         (func1 func2: B -> C),
+    Forall2 pred la lb ->
+    (forall a b, pred a b -> func1 b = func2 b) ->
+    map func1 lb = map func2 lb.
+Proof.
+  intros.
+  induction H.
+  - simpl. reflexivity.
+  - simpl.
+    rewrite IHForall2.
+    assert (func1 y = func2 y) as H_func_eq. {
+      specialize (H0 x y H).
+      assumption.
+    }
+    rewrite H_func_eq.
+    reflexivity.
+Qed.
+
+Lemma Forall2_inv:
+  forall {A B: Type}
+         {pred: A -> B -> Prop}
+         {la: list A} {lb: list B}
+         {a: A} {b: B},
+    Forall2 pred (a :: la) (b :: lb) ->
+    pred a b /\ Forall2 pred la lb.
+Proof.
+  intros.
+  inversion H.
+  split; auto.
+Qed.
+
+Lemma sum_map_zero:
+  forall {A: Type}
+         (l: list A)
+         (func: A -> R),
+    (forall a, In a l -> func a = 0%R) ->
+    sum (map func l) = 0%R.
+Proof.
+  intros.
+  induction l.
+  - simpl. reflexivity.
+  - simpl.
+    rewrite H.
+    2: {
+      left. reflexivity.
+    }
+    rewrite IHl.
+    lra.
+    intros.
+    apply H.
+    right. assumption.
+Qed.
+
+Lemma concat_map_singleton:
+  forall {A: Type}
+         (l: list A),
+    concat (map (fun x => [x]) l) = l.
+Proof.
+  intros.
+  induction l.
+  - simpl. reflexivity.
+  - simpl.
+    rewrite IHl.
+    reflexivity.
+Qed.
+
 Lemma bind_ret_r:
   forall (A: Type)
          (f: ProbMonad.M A),
   bind f ret == f.
-Admitted. (** Level 3 *)
+Proof.
+  intros.
+  unfold ProbMonad.equiv; sets_unfold.
+  intros da.
+  unfold bind in *; simpl.
+  unfold ProbMonad.__bind in *.
+  unfold ProbMonad.__ret in *.
+  sets_unfold.
+  split.
+  {
+    intros.
+    destruct H as [da' [lab [Hda' [Hlab H_sum_lab_db]]]].
+    apply f.(legal).(Legal_congr) with da'.
+    2: assumption.
+    destruct H_sum_lab_db as [H_perm_lab_da H_prob_lab_da].
+    split.
+    {
+      clear H_perm_lab_da.
+      intros a.
+      rewrite H_prob_lab_da.
+      pose proof Forall2_to_forall _ _ _ Hlab as Hlab'.
+
+      (* 
+        da'.(pset) may contain a, or may not.
+        in both cases, we can filter out what is in da'.(pset) and is not a.
+        this part in the sum-map will all be 0, as they can't pass the 'is_det a d' check.
+      *)
+
+      destruct (in_dec eq_dec a da'.(pset)) as [H_in | H_not_in].
+      {
+        (* In a da'.pset
+          we can partition da'.pset into two parts: [a] and the rest.
+          NoDup da'.pset is used so the rest does not contain a.
+        *)
+        pose proof f.(legal).(Legal_legal) _ Hda' as H_legal_da'.
+        destruct H_legal_da'.
+
+        pose proof NoDup_partition_singleton _ _ legal_no_dup H_in as Hpart.
+        destruct Hpart as [filtered_dapset [H_filtered_dapset H_filtered_dapset_no_a]].
+
+        clear Hlab'.
+        simpl in H_filtered_dapset.
+        (* rearrange the Hlab *)
+        pose proof Forall2_perm_l_exists _ _ _ _ H_filtered_dapset Hlab as Hlab_rearrange.
+        destruct Hlab_rearrange as [lab_rearrange [H_perm_lab_lab_rearrange Hlab_rearrange]].
+        destruct lab_rearrange as [| [r d] lab_rearrange]; [inversion Hlab_rearrange|].
+        pose proof Forall2_inv Hlab_rearrange as [Hlab1 Hlab2].
+        destruct Hlab1 as [H_r H_det_a_d].
+        destruct H_det_a_d as [_ [H_prob_a _]].
+
+        (* sum-map over rearranged lab*)
+        rewrite H_perm_lab_lab_rearrange.
+        simpl.
+        rewrite H_r.
+        rewrite H_prob_a.
+        enough (sum (map (fun '(r0, d0) => r0 * d0.(prob) a) lab_rearrange) = 0)%R by lra.
+        apply sum_map_zero.
+        intros [r0 d0] H_in_lab_rearrange.
+        pose proof Forall2_in_r_exists _ _ _ Hlab2 _ H_in_lab_rearrange as H_lab_rearrange.
+        destruct H_lab_rearrange as [a0 [H_in_filtered_dapset [_ H_d0]]].
+        destruct H_d0 as [_ [_ H_prob_zero_d0]].
+        specialize (H_prob_zero_d0 a).
+        (* a0 is in filterd pset while a is not. so a0<>a *)
+        assert (a0 <> a) as H_neq by (intro; subst; contradiction).
+        specialize (H_prob_zero_d0 H_neq).
+        rewrite H_prob_zero_d0.
+        lra.
+      }
+      {
+        (* 
+          a is not in da'.pset, which is the same as the above case's second part.
+        *)
+        pose proof f.(legal).(Legal_legal) _ Hda' as H_legal_da'.
+        pose proof not_in_pset_prob_0 _ _ H_legal_da' H_not_in as H_prob_zero.
+        rewrite H_prob_zero. clear H_prob_zero.
+        symmetry.
+        apply sum_map_zero.
+        intros [r0 d0] H_in_lab.
+        pose proof Forall2_in_r_exists _ _ _ Hlab _ H_in_lab as H_lab.
+        destruct H_lab as [a0 [H_in_dapset [_ H_d0]]].
+        destruct H_d0 as [_ [_ H_prob_zero_d0]].
+        specialize (H_prob_zero_d0 a).
+        assert (a0 <> a) as H_neq by (intro; subst; contradiction).
+        specialize (H_prob_zero_d0 H_neq).
+        rewrite H_prob_zero_d0.
+        lra.
+      }
+    }
+    {
+      clear H_prob_lab_da.
+      rewrite H_perm_lab_da.
+      clear H_perm_lab_da.
+      assert (
+        (map (fun '(_, d) => d.(pset)) lab)
+        =
+        map (fun x => [x]) da'.(pset)
+      ). {
+        induction Hlab.
+        - simpl. reflexivity.
+        - simpl.
+          rewrite IHHlab.
+          destruct y.
+          destruct H.
+          destruct H0.
+          rewrite H0.
+          reflexivity.
+      }
+      rewrite H; clear H.
+      rewrite concat_map_singleton.
+      rewrite <- nodup_perm_filter_dup.
+      - auto.
+      - apply f.(legal).(Legal_legal).
+        assumption. 
+    }
+  }
+  {
+    intros Hda.
+    pose proof f.(legal).(Legal_legal) _ Hda as H_legal_da.
+    destruct H_legal_da.
+    exists da.
+    (* 
+      l is a list of singleton prob distr's, each of which is from one element in da.pset.
+    *)
+    exists (map (fun a => (da.(prob) a, make_det a)) da.(pset)).
+
+    split; auto.
+    split.
+    {
+      clear legal_no_dup.
+      clear legal_pset_valid.
+      clear legal_prob_1.
+      induction da.(pset).
+      - simpl. 
+        constructor.
+      - simpl.
+        constructor.
+        + split.
+          * reflexivity.
+          * apply make_det_is_det.
+        + apply IHl.
+    }
+    split.
+    {
+      clear legal_no_dup.
+      clear legal_pset_valid.
+      clear legal_prob_1.
+      clear legal_nonneg.
+      remember (fun '(_, d) => d.(pset)) as get_snd_pset.
+      remember (fun a : A => (da.(prob) a, make_det a)) as func.
+      rewrite map_map.
+      subst.
+      assert ((fun x : A => (make_det x).(pset))
+              = (fun x : A => [x])) as H. {
+        apply functional_extensionality.
+        intros a.
+        unfold make_det.
+        simpl.
+        reflexivity.
+      }
+      rewrite H; clear H.
+      rewrite concat_map_singleton.
+      rewrite <- nodup_perm_filter_dup.
+      - auto.
+      - apply f.(legal).(Legal_legal).
+        assumption.
+    }
+    {
+      intros a.
+      remember (fun '(r, d) => (r * d.(prob) a)%R) as calc_prob.
+      remember (fun a0 : A => (da.(prob) a0, make_det a0)) as func.
+      rewrite map_map.
+      subst.
+
+      (* as the above proof, da.(pset) can be partitioned into
+        [a] and the rest (if a is indeed in da.(pset)) or
+        only the rest (if a is not in da.(pset)).
+      *)
+
+      destruct (in_dec eq_dec a da.(pset)) as [H_in | H_not_in].
+      {
+        pose proof NoDup_partition_singleton _ _ legal_no_dup H_in as Hpart.
+        destruct Hpart as [filtered_dapset [H_filtered_dapset H_filtered_dapset_no_a]].
+        rewrite H_filtered_dapset.
+        simpl.
+        enough (
+          sum (map (fun x : A => da.(prob) x * (if eq_dec x a then 1 else 0)) filtered_dapset)
+          = 0
+        )%R. {
+          rewrite H.
+          destruct (eq_dec a a) as [_ | H_neq]; [ | contradiction].
+          lra.
+        }
+        apply sum_map_zero.
+        intros a0 H_in_filtered_dapset.
+        destruct (eq_dec a0 a) as [H_eq | H_neq].
+        - subst.
+          contradiction.
+        - lra.
+      }
+      {
+        pose proof not_in_pset_prob_0 _ _ (f.(legal).(Legal_legal) _ Hda) H_not_in as H_prob_zero.
+        rewrite H_prob_zero.
+        symmetry.
+        apply sum_map_zero.
+        intros a0 H_in_lab.
+        unfold make_det; simpl.
+        destruct (eq_dec a0 a) as [H_eq | H_neq].
+        - subst.
+          contradiction.
+        - lra.
+      }
+    }
+  }
+Qed.
 
