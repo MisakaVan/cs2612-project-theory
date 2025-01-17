@@ -665,6 +665,15 @@ Proof.
     reflexivity.
 Qed.
 
+Lemma F2_sl {A B: Type}:
+  forall {P: A -> B -> Prop} {l1 l2},
+    Forall2 P l1 l2 ->
+    length l1 = length l2.
+Proof.
+  exact Forall2_same_length.
+Qed.
+
+
 Lemma Forall2_in_r_exists:
   forall {A B: Type} (l1: list A) (l2: list B) (f: A -> B -> Prop),
     Forall2 f l1 l2 ->
@@ -4676,6 +4685,8 @@ Admitted.
 
 Lemma combine_Forall2:
   forall {A B C: Type} (l1: list A) (l2: list B) (l3: list C) (f: A -> B -> C -> Prop),
+    length l1 = length l2 ->
+    length l1 = length l3 ->
     (forall a b c,
       In (a, b) (combine l1 l2) ->
       In (a, c) (combine l1 l3) ->
@@ -5041,6 +5052,8 @@ Proof.
       ). {
         pose proof combine_Forall2 da.(pset) lab lac.
         specialize (H0 (fun a b c => pred (a, b) (a, c))).
+        specialize (H0 (F2_sl Hlab)).
+        specialize (H0 (F2_sl Hlac)).
         specialize (H0 H).
         eapply Forall2_imply.
         - apply H0.
@@ -5168,6 +5181,7 @@ Proof.
         ). {
           pose proof combine_Forall2 d1.(pset) lbc' l_sum_to_bc'.
           specialize (H0 (fun a b c => pred (a, b) (a, c))).
+          specialize (H0 (F2_sl Hlbc') (F2_sl H_forall2_l_sum_to_bc)).
           specialize (H0 H).
           eapply Forall2_imply.
           - apply H0.
@@ -5615,6 +5629,7 @@ Proof.
       ). {
         pose proof combine_Forall2 da.(pset) lac lab' as Har1d1.
         specialize (Har1d1 (fun a b c => pred (a, b) (a, c))).
+        specialize (Har1d1 (F2_sl Hlac) (F2_sl Hlab')).
         specialize (Har1d1 H).
         eapply Forall2_imply.
         - apply Har1d1.
@@ -5723,6 +5738,7 @@ Proof.
       ). {
         pose proof combine_Forall2 db'.(pset) lbc' filtered_lbc as Har1d1.
         specialize (Har1d1 (fun a b c => pred (a, b) (a, c))).
+        specialize (Har1d1 (F2_sl Hlbc') (F2_sl Hlbc'')).
         specialize (Har1d1 H).
         eapply Forall2_imply.
         - apply Har1d1.
