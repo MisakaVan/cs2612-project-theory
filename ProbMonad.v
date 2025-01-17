@@ -3384,160 +3384,225 @@ Proof.
   assumption.
 Qed.
 
-#[export] Instance ProbMonad_bind_mono_event (A: Type):
-  Proper (ProbMonad.equiv ==>
-          pointwise_relation _ ProbMonad.imply_event ==>
-          ProbMonad.imply_event)
-    (@bind _ ProbMonad A Prop).
+Lemma list_map_forall_exists:
+  forall {A B: Type} (f: A -> B -> Prop) (l1: list A),
+    (forall a, exists b, f a b) -> exists l2, Forall2 f l1 l2.
 Proof.
-  unfold Proper, pointwise_relation, respectful.
-  unfold ProbMonad.equiv, ProbMonad.imply_event in *.
-  sets_unfold.
-  intros x y H f g H0.
-  unfold ProbMonad.__bind.
-  sets_unfold.
-  pose proof (x <- x;; f x).(legal).(Legal_exists) as [dx Hdx].
-  pose proof (x <- y;; g x).(legal).(Legal_exists) as [dy Hdy].
-  exists dx, dy.
-  repeat split; auto.
-  sets_unfold in Hdx.
-  sets_unfold in Hdy.
-  simpl in *.
-  unfold ProbMonad.__bind in *.
-  destruct Hdx as [dA_x [lx [Hdx [Hlx H_sum_lx]]]].
-  destruct Hdy as [dA_y [ly [Hdy [Hly H_sum_ly]]]].
-
-Proof. 
-  unfold Proper, pointwise_relation, respectful.
-  unfold ProbMonad.equiv, ProbMonad.imply_event in *.
-  sets_unfold.
-  intros x y H f g H0.
-  simpl.
-  unfold ProbMonad.__bind.
-  sets_unfold.
-  pose proof x.(legal).(Legal_exists) as [dA_x Hdx].
-  pose proof y.(legal).(Legal_exists) as [dA_y Hdy].
-  pose proof exists_lx_ly dA_x f g H0 as [lx [ly [Hlx [Hly H_imp]]]].
-  pose proof exists_dp_based_on_l dA_x f g lx ly Hlx Hly H_imp as [dPx [dPy [H_sum_lx [H_sum_ly H_imp_dPx_dPy]]]].
-  exists dPx, dPy.
-  repeat split; auto.
-  - exists dA_x, lx.
-    split; auto.
-  - exists dA_x, ly.
-    split; auto.
-    apply (H dA_x).
-    auto.
+  intros A B f l1 H.
+  induction l1 as [| a l1'].
+  - exists [].
+    constructor.
+  - destruct IHl1' as [l2 IH].
+    specialize (H a).
+    destruct H as [b Hb].
+    exists (b :: l2).
+    constructor; [tauto | exact IH].
 Qed.
 
-(* 
-Proof. 
-  unfold Proper, pointwise_relation, respectful.
-  unfold ProbMonad.equiv in *.
-  sets_unfold.
-  intros x y H f g H0.
-  unfold ProbMonad.imply_event.
-  simpl.
+Lemma ProbDistr_sum_distr_exists:
+  forall {A: Type} (l: list (R * Distr A)),
+    exists d, ProbDistr.sum_distr l d.
+Admitted.
+
+Lemma list_forall_imply_event_with_sum_distributions:
+  forall (L1 L2 : list (R * Distr Prop)) (ds1 ds2 : Distr Prop),
+     Forall2 (fun '(r1, d1) '(r2, d2) => r1 = r2 /\ ProbDistr.imply_event d1 d2) L1 L2
+  -> ProbDistr.sum_distr L1 ds1 
+  -> ProbDistr.sum_distr L2 ds2
+  -> ProbDistr.imply_event ds1 ds2.
+Proof.
+  intros.
+  induction H.
+  - unfold ProbDistr.imply_event.
+    destruct H0 as [H_pset1 H_prob1].
+    destruct H1 as [H_pset2 H_prob2].
+    exists 0%R, 0%R.
+    repeat split; [| | lra].
+Admitted.
+
+Lemma Forall2_imply_event_pairs :
+  forall (X: Type) (distX: Distr X) (mapG mapH: X -> ProbMonad.M Prop)
+         (pairsG pairsH: list (R * Distr Prop)),
+    (forall x, ProbMonad.imply_event (mapG x) (mapH x)) ->
+    Forall2
+      (fun x '(rg, dg) => rg = distX.(prob) x /\ dg ∈ (mapG x).(distr))
+      distX.(pset) pairsG ->
+    Forall2
+      (fun x '(rh, dh) => rh = distX.(prob) x /\ dh ∈ (mapH x).(distr))
+      distX.(pset) pairsH ->
+    Forall2
+      (fun '(rG, dG) '(rH, dH) => rG = rH /\ ProbDistr.imply_event dG dH)
+      pairsG pairsH.
+Proof.
+  intros X distX mapG mapH pairsG pairsH Hmono HFg HFh.
+  (* We will proceed by induction on HFg, while simultaneously
+     matching it with HFh via 'revert ...; induction ...'. *)
+  revert pairsH HFh.
+  induction HFg; intros.
+  - (* Base case: both lists must be empty *)
+    inversion HFh. constructor.
+  - (* Inductive case: pair up heads, then recurse on tails *)
+    inversion HFh; subst.
+    constructor.
+    + (* Show the heads satisfy rG = rH and an imply_event relation *)
+      destruct y  as [rG dG].
+      destruct y0 as [rH dH].
+      destruct H  as [HG_eq  HG_in].
+      destruct H2 as [HH_eq  HH_in].
+      split.
+      * (* Show rG = rH by combining HG_eq and HH_eq *)
+        rewrite HG_eq, HH_eq. reflexivity.
+      * (* Show dG ==> dH using mapG x ==> mapH x and distribution uniqueness *)
+        specialize (Hmono x).
+        unfold ProbMonad.imply_event in Hmono.
+        destruct Hmono as [midG [midH [HmidG [HmidH Himpl]]]].
+        (* Use the .(legal).(Legal_unique) property to identify
+           dG with midG and dH with midH, then apply congruence. *)
+        pose proof ((mapG x).(legal).(Legal_unique) dG midG HG_in HmidG) as HeqG.
+        pose proof ((mapH x).(legal).(Legal_unique) dH midH HH_in HmidH) as HeqH.
+        apply ProbDistr_equiv_equiv_event in HeqG.
+        apply ProbDistr_equiv_equiv_event in HeqH.
+        apply ProbDistr_imply_event_congr with midG midH;
+          [exact HeqG | exact HeqH | exact Himpl].
+    + (* Inductive step on tails *)
+      apply IHHFg. exact H4.
+Qed.
+
+Lemma bind_congruence_step:
+  forall (A: Type) (dx dy: Distr A) (g: A -> ProbMonad.M Prop) 
+         (lx ly: list (R * Distr Prop)) (dsx dsy: Distr Prop),
+    ProbDistr.equiv dx dy ->
+    Forall2 (fun a '(r, d) => r = dx.(prob) a /\ d ∈ (g a).(distr)) dx.(pset) lx ->
+    Forall2 (fun a '(r, d) => r = dy.(prob) a /\ d ∈ (g a).(distr)) dy.(pset) ly ->
+    ProbDistr.sum_distr lx dsx ->
+    ProbDistr.sum_distr ly dsy ->
+    ProbDistr.equiv dsx dsy.
+Proof.
+Admitted.
+
+#[export] Instance ProbMonad_bind_mono_event (A: Type):
+Proper
+  (ProbMonad.equiv ==>
+    pointwise_relation _ ProbMonad.imply_event ==>
+    ProbMonad.imply_event)
+  (@bind _ ProbMonad A Prop).
+Proof.
+  unfold Proper, respectful.
+  intros dM1 dM2 H_equivDist fM1 fM2 H_imply.
+  unfold ProbMonad.imply_event; simpl.
   unfold ProbMonad.__bind.
-  sets_unfold.
-  pose proof x.(legal).(Legal_exists) as [dA_x Hdx].
-  pose proof y.(legal).(Legal_exists) as [dA_y Hdy].
-  pose proof x.(legal).(Legal_legal) dA_x Hdx as H_legal_x.
-  pose proof y.(legal).(Legal_legal) dA_y Hdy as H_legal_y.
-  assert (exists a, In a dA_x.(pset)) as Ha. {
-    pose proof ProbDistr.legal_prob_1 dA_x H_legal_x as H_prob_1.
-    destruct dA_x.(pset) as [|a l].
-    - exfalso.
-      unfold sum_prob in H_prob_1.
-      simpl in H_prob_1.
-      lra.
-    - exists a.
-      left.
-      reflexivity.
+  unfold pointwise_relation in H_imply.
+
+  (* Obtain witnesses of distributions from dM1 and dM2 *)
+  destruct (dM1.(legal).(Legal_exists)) as [dist1 in_dM1].
+  destruct (dM2.(legal).(Legal_exists)) as [dist2 in_dM2].
+
+  (* Because dM1 and dM2 are equivalent, dist1 and dist2 must be equivalent *)
+  assert (ProbDistr.equiv dist1 dist2) as eqDist12.
+  {
+    eapply dM1.(legal).(Legal_unique).
+    - exact in_dM1.
+    - apply H_equivDist.  
+      exact in_dM2.
   }
-  destruct Ha as [a H_in_a].
-  pose proof H0 a as [dP_a [dP_b [Hda [Hdb H_imp]]]].
-  exists dP_a, dP_b.
-  repeat split; auto.
-  + exists dA_x.
-    (* 构造list_r，把dP_a.(pset)的每个元素a_i映射成其概率dA_x.(prob) a_i *)
-    set (list_r := map dA_x.(prob) dA_x.(pset)).
-    (* 构造list_d，均为dP_a，长度为dA_x.(pset)的长度 *)
-    set (list_d := repeat dP_a (length dA_x.(pset))).
-    (* 证明list_r和list_d的长度相等 *)
-    assert (length list_r = length list_d) as H_length_rd. {
-      unfold list_r, list_d.
-      rewrite map_length, repeat_length.
-      reflexivity.
-    }
-    set (l := combine list_r list_d).
-    assert (length l = length dA_x.(pset)) as H_length_l. {
-      unfold l.
-      (* Search (length (combine _ _)). *)
-      pose proof combine_length list_r list_d as H_combine_length.
-      (* Search (Init.Nat.min). *)
-      assert (Init.Nat.min (length list_r) (length list_d) = length list_r). {
-        rewrite H_length_rd.
-        apply Nat.min_id.
-      }
-      rewrite H_combine_length, H1.
-      unfold list_r.
-      rewrite map_length.
-      reflexivity.
-    }
-    exists l.
-    repeat split; auto.
-    - pose proof forall_to_forall2 dA_x.(pset) l (fun (a0 : A) '(r, d) => r = dA_x.(prob) a0 /\ (f a0).(distr) d) as H_forall2.
-      apply H_forall2.
-      intros a0 [r d] H_in_combine.
-      * Search (combine).
-        Search (nth_error).
-        pose proof In_nth _ _ (a0, (r, d)) H_in_combine as [n Hnth].
-        destruct Hnth as [Hn Hnth].
-        Search (nth _ (combine _ _)).
-        apply symmetry in H_length_l.
-        pose proof combine_nth dA_x.(pset) l n a0 (r, d) H_length_l as H_nth_ard.
-        rewrite Hnth in H_nth_ard.
-        injection H_nth_ard as H_nth_a H_nth_l.
-        unfold l in H_nth_l.
-        pose proof combine_nth list_r list_d n r d H_length_rd as H_nth_rd.
-        rewrite H_nth_rd in H_nth_l.
-        injection H_nth_l as H_nth_r H_nth_d.
-        split.
-        -- Search (nth _ (map _ _) _).
-           pose proof map_nth dA_x.(prob) dA_x.(pset) a0 n as H_map.
-           rewrite <- H_nth_a in H_map.
-           unfold list_r in H_nth_r.
-           Search (nth).
-           pose proof nth_indep (map dA_x.(prob) dA_x.(pset)) as H_nth_indep.
-           specialize (H_nth_indep n r (dA_x.(prob) a0)).
-           assert (n < length (map dA_x.(prob) dA_x.(pset))) as Hn_lt. {
-             rewrite map_length.
-             assert (length (combine dA_x.(pset) l) = length dA_x.(pset)). {
-               pose proof combine_length dA_x.(pset) l as H_combine_length.
-               rewrite H_length_l in H_combine_length.
-               assert (Init.Nat.min (length l) (length l) = length l) by apply Nat.min_id.
-               rewrite H1 in H_combine_length.
-               rewrite H_length_l.
-               assumption.
-             }
-             rewrite <- H1.
-              assumption.
-           }
-           pose proof H_nth_indep Hn_lt.
-           rewrite H_nth_r, <- H_map.
-           assumption.
-        -- unfold list_d in H_nth_d.
-           Search (In _ (combine _ _)).
-           pose proof in_combine_r dA_x.(pset) l a0 (r, d) H_in_combine.
-           unfold l in H1.
-           pose proof in_combine_r list_r list_d r d H1.
-           unfold list_d in H2.
-           Search (repeat).
-           pose proof repeat_spec (length dA_x.(pset)) dP_a d H2.
-           rewrite H3.
-           pose proof H0 a0.
-           destruct H4 as [dP_a0 [dP_b0 [Hda0 [Hdb0 H_imp0]]]].
-Admitted. *)
+
+  (* For each element a in dist1, pick a distribution from fM1 a *)
+  assert (exists list1,
+             Forall2
+               (fun a '(r,d) => r = dist1.(prob) a /\ d ∈ (fM1 a).(distr))
+               dist1.(pset) list1)
+    as [list1 H_list1].
+  {
+    eapply list_map_forall_exists.
+    intros a0.
+    destruct (fM1 a0).(legal).(Legal_exists) as [someDist in_fM1].
+    exists (dist1.(prob) a0, someDist). 
+    split; [reflexivity | exact in_fM1].
+  }
+
+  (* For each element a in dist1, pick a distribution from fM2 a *)
+  assert (exists list2,
+             Forall2
+               (fun a '(r,d) => r = dist1.(prob) a /\ d ∈ (fM2 a).(distr))
+               dist1.(pset) list2)
+    as [list2 H_list2].
+  {
+    eapply list_map_forall_exists.
+    intros a0.
+    destruct (fM2 a0).(legal).(Legal_exists) as [someDist in_fM2].
+    exists (dist1.(prob) a0, someDist).
+    split; [reflexivity | exact in_fM2].
+  }
+
+  (* For each element a in dist2, pick a distribution from fM2 a *)
+  assert (exists list3,
+             Forall2
+               (fun a '(r,d) => r = dist2.(prob) a /\ d ∈ (fM2 a).(distr))
+               dist2.(pset) list3)
+    as [list3 H_list3].
+  {
+    eapply list_map_forall_exists.
+    intros a0.
+    destruct (fM2 a0).(legal).(Legal_exists) as [someDist in_fM2].
+    exists (dist2.(prob) a0, someDist).
+    split; [reflexivity | exact in_fM2].
+  }
+
+  (* Build sums from list1, list2, list3 *)
+  assert (
+    exists dSum1 dSum2 dSum3,
+      ProbDistr.sum_distr list1 dSum1 /\
+      ProbDistr.sum_distr list2 dSum2 /\
+      ProbDistr.sum_distr list3 dSum3
+      /\
+      ProbDistr.imply_event dSum1 dSum2
+      /\ ProbDistr.equiv dSum2 dSum3
+  ) as [d1 [d2 [d3 [H_sum1 [H_sum2 [H_sum3 [H_imply12 H_equiv23]]]]]]].
+  {
+    (* Produce distributions out of list1, list2, list3 *)
+    destruct (ProbDistr_sum_distr_exists list1) as [d1x H_d1].
+    destruct (ProbDistr_sum_distr_exists list2) as [d2x H_d2].
+    destruct (ProbDistr_sum_distr_exists list3) as [d3x H_d3].
+    exists d1x, d2x, d3x.
+    split; [exact H_d1 |].
+    split; [exact H_d2 |].
+    split; [exact H_d3 |].
+    (* imply_event part from fM1 -> fM2 over the same base dist1 *)
+    split.
+    - (* show that d1x implies d2x by matching pairs from list1/list2 *)
+      eapply list_forall_imply_event_with_sum_distributions with list1 list2.
+      ++ apply (Forall2_imply_event_pairs A dist1 fM1 fM2 list1 list2).
+         +++ exact H_imply.
+         +++ exact H_list1.
+         +++ exact H_list2.
+      ++ exact H_d1.
+      ++ exact H_d2.
+    - (* show that d2x and d3x are equivalent, using dist1/dist2 equivalence *)
+      eapply (bind_congruence_step A dist1 dist2 fM2 list2 list3 d2x d3x).
+      + exact eqDist12.
+      + exact H_list2.
+      + exact H_list3.
+      + exact H_d2.
+      + exact H_d3.
+  }
+
+  (* Finally, produce the distributions needed for the main imply_event goal *)
+  exists d1, d3.
+  split.
+  - (* d1 comes from bind dM1 fM1 *)
+    exists dist1, list1.
+    split; [exact in_dM1 | split; [exact H_list1 | exact H_sum1]].
+  - split.
+    + (* d3 comes from bind dM2 fM2 *)
+      exists dist2, list3.
+      split; [exact in_dM2 | split; [exact H_list3 | exact H_sum3]].
+    + (* chaining d1 => d2 => d3 to conclude d1 => d3 *)
+      eapply ProbDistr_imply_event_trans.
+      * exact H_imply12.
+      * eapply ProbDistr_imply_event_refl_setoid.
+        eapply ProbDistr_equiv_equiv_event.
+        exact H_equiv23.
+Qed.
       
 Lemma ProbDistr_imply_event_equiv_event:
   forall d1 d2,
