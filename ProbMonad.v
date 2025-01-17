@@ -2695,17 +2695,79 @@ Proof.
     constructor; auto.
 Qed.
 
+Lemma filter_dup_cons:
+  forall {A: Type} (l: list A) (a: A),
+    filter_dup (a :: l) = set_add eq_dec a (filter_dup l).
+Proof.
+  intros.
+  unfold filter_dup.
+  simpl.
+  reflexivity.
+Qed.
+
+Lemma set_add_already_in:
+  forall {A: Type} (l: list A) (a: A),
+    In a l -> set_add eq_dec a l = l.
+Proof.
+  intros.
+  induction l.
+  - contradiction.
+  - simpl.
+    destruct (eq_dec a a0).
+    + subst.
+      reflexivity.
+    + simpl in H.
+      destruct H.
+      * subst; contradiction.
+      * f_equal.
+        apply IHl.
+        auto.
+Qed.
+
+Lemma set_add_not_in:
+  forall {A: Type} (l: list A) (a: A),
+    ~ In a l -> set_add eq_dec a l = l ++ [a].
+Proof.
+  intros.
+  induction l.
+  - simpl.
+    reflexivity.
+  - simpl.
+    destruct (eq_dec a a0).
+    + subst.
+      assert (In a0 (a0 :: l)) by apply in_eq.
+      contradiction.
+    + simpl.
+      f_equal.
+      apply IHl.
+      unfold not.
+      intros.
+      apply H.
+      right.
+      auto.
+Qed.
+
 Lemma perm_filter_dup_notin:
   forall {A: Type} (l: list A) (a: A),
     ~ In a (filter_dup l) ->
     Permutation (filter_dup (a :: l)) (a :: filter_dup l).
-Admitted.
+Proof.
+  intros.
+  rewrite filter_dup_cons.
+  rewrite set_add_not_in; auto.
+  rewrite Permutation_app_comm.
+  simpl; auto.
+Qed.
 
 Lemma perm_filter_dup_in:
   forall {A: Type} (l: list A) (a: A),
     In a (filter_dup l) ->
     Permutation (filter_dup (a :: l)) (filter_dup l).
-Admitted.
+Proof.
+  intros.
+  rewrite filter_dup_cons.
+  rewrite set_add_already_in; auto.
+Qed.
 
 Lemma in_exists_remaining_list_perm:
   forall {A: Type} (l: list A) (a: A) ,
