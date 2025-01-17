@@ -4108,7 +4108,10 @@ Qed.
 Lemma ProbDistr_sum_distr_exists:
   forall {A: Type} (l: list (R * Distr A)),
     exists d, ProbDistr.sum_distr l d.
-Admitted.
+Proof.
+  intros.
+  apply sum_distr_exists.
+Qed.
 
 Lemma list_forall_imply_event_with_sum_distributions:
   forall (L1 L2 : list (R * Distr Prop)) (ds1 ds2 : Distr Prop),
@@ -4741,7 +4744,14 @@ Lemma In_combine_Forall2:
     Forall2 f l1 l2 ->
     f a b.
 Proof.
-Admitted.
+  intros.
+  pose proof Forall2_to_forall _ _ _ H0.
+  Search Forall.
+  rewrite Forall_forall in H1.
+  specialize (H1 (a, b) H).
+  simpl in *.
+  tauto.
+Qed.
 
 Lemma combine_exists:
   forall {A B: Type} (l: list (A * B)),
