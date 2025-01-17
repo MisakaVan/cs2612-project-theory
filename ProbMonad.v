@@ -5068,7 +5068,58 @@ Proof.
         assumption.
       }
       {
-        admit. (* should be similar *)
+        intros H_c_in_lac.
+        pose proof In_concat_map_exists _ _ _ H_c_in_lac as H_c_in_lac_ex.
+        clear H_c_in_lac.
+        destruct H_c_in_lac_ex as [[r dc'] [H_in_lac' H_in_dc']].
+        pose proof Forall2_in_r_exists _ _ _ Hlac _ H_in_lac' as H_lac'.
+        destruct H_lac' as [a' [H_in_dapset [_ H2]]].
+        destruct H2 as [db' [H_db' [lbc' [H_forall2_bc H_sum_bc]]]].
+        destruct H_sum_bc as [H_sum_bc _].
+
+        (* a' in da.(pset), see lab *)
+        pose proof Forall2_in_l_exists _ _ _ Hlab _ H_in_dapset as H_lab.
+        destruct H_lab as [[rb1 db1] [H_in_lab [_ H_db1]]].
+
+        (* db1 and db' are both from (g a'). *)
+        pose proof (g a').(legal).(Legal_unique) _ _ H_db1 H_db' as H_unique_db1_db'.
+        destruct H_unique_db1_db' as [_ H_perm_db1_db'].
+
+        (* c is from dc', which is summed from lbc'. therefore there must be some b'
+            such that c is from (h b'). *)
+        rewrite H_sum_bc in H_in_dc'.
+        apply filter_dup_incl in H_in_dc'.
+        pose proof In_concat_map_exists _ _ _ H_in_dc' as H_in_dc'_ex.
+        clear H_in_dc'.
+        destruct H_in_dc'_ex as [[r' dc''] [H_in_lbc' H_in_dc'']].
+
+        pose proof Forall2_in_r_exists _ _ _ H_forall2_bc _ H_in_lbc' as H_lbc'.
+        destruct H_lbc' as [b' [H_in_dbpset [_ H_dc''_hb]]].
+
+        (* as db' and db1 are equiv, b' is in db1 *)
+        rewrite <-H_perm_db1_db' in H_in_dbpset.
+
+        (* db1 makes up db via lab *)
+        assert (In b' db.(pset)) as H_in_dbpset'. {
+          rewrite H_sum_ladb.
+          rewrite <- filter_dup_incl.
+          apply In_in_concat_map.
+          exists (rb1, db1).
+          split; auto.
+        }
+
+        (* b' is in db, so some (h b') will make up dc via lbc *)
+        pose proof Forall2_in_l_exists _ _ _ Hlbc _ H_in_dbpset' as H_lbc.
+        destruct H_lbc as [[r'' dc'''] [H_in_lbc'' [_ H2]]].
+        
+        apply In_in_concat_map.
+        exists (r'', dc''').
+        split; auto.
+        (* dc''' and dc'' are all from h b' *)
+        pose proof (h b').(legal).(Legal_unique) _ _ H_dc''_hb H2 as H_unique_dc'''_dc''.
+        destruct H_unique_dc'''_dc'' as [_ H_perm_dc'''_dc''].
+        rewrite <- H_perm_dc'''_dc''.
+        assumption.
       }
     }
     {
@@ -6181,7 +6232,7 @@ Proof.
       reflexivity.
     }
   }
-Admitted. (** Level 3 *)
+Qed. (** Level 3 *)
 
 Lemma bind_assoc_event:
   forall (A B: Type)
