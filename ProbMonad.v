@@ -3144,7 +3144,17 @@ Lemma not_in_filter_dup_remove:
   forall {A: Type} (l1 l2: list A) (a: A),
     ~ In a (filter_dup (l1 ++ l2)) -> ~ In a (filter_dup l2).
 Proof.
-Admitted.
+  intros.
+  unfold not.
+  intros.
+  apply H.
+  clear H.
+  pose proof filter_dup_in _ _ H0.
+  apply filter_dup_in_inv.
+  apply in_or_app.
+  right.
+  auto.
+Qed.
 
 Lemma prob_zero_1:
   forall {A: Type} (l: list (R * Distr Prop)) (d0: Distr Prop) (la: list A) (dA: Distr A) (Q: A -> Prop) (a: A),
