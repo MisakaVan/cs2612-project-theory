@@ -1211,20 +1211,6 @@ Proof.
     reflexivity.
 Qed.
 
-(* Forall2
-               (fun '(r1, d1) '(r2, d2) =>
-                r1 = r2 /\ ProbDistr.equiv d1 d2) 
-  l1 l2 
-  holds, then sum_distr l1 ?d0 -> sum_distr l2 ?d0  
-  make it a proper instance *)              
-(* Lemma sum_distr_congr {A: Type}:
-  Proper (Forall2 (fun '(r1, d1) '(r2, d2) => r1 = r2 /\ ProbDistr.equiv d1 d2) ==> ProbDistr.equiv ==> iff) (@ProbDistr.sum_distr A).
-Proof.
-  unfold Proper, respectful.
-  intros l1 l2 Hl r1 r2 ?.
-  split; intros.
-  - destruct H0 as [Hpset Hprob]. *)
-(* Admitted. *)
 
 Lemma sum_distr_congr {A: Type}:
   forall (l1 l2: list (R * Distr A)) (d0: Distr A),
