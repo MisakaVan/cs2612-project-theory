@@ -1294,18 +1294,6 @@ Proof.
     reflexivity.
 Qed.
 
-Lemma combine_permutation_l_exists_holds:
-  forall {A B: Type} (l1: list A) (l2: list B)
-    (l1': list A) pred,
-    Forall2 pred l1 l2 ->
-    Permutation l1 l1' ->
-    exists l2',
-      Permutation l2 l2' /\
-      Permutation (combine l1 l2) (combine l1' l2') /\
-      (* Forall2 still holds *)
-      Forall2 pred l1' l2'.
-Proof.
-Admitted.
 
 Lemma combine_Forall2:
   forall {A B C: Type} (l1: list A) (l2: list B) (l3: list C) (f: A -> B -> C -> Prop),
@@ -1574,6 +1562,32 @@ Proof.
     tauto.
 Qed.
 
+Lemma combine_permutation_l_exists_holds:
+  forall {A B: Type} (l1: list A) (l2: list B)
+    (l1': list A) pred,
+    Forall2 pred l1 l2 ->
+    Permutation l1 l1' ->
+    exists l2',
+      Permutation l2 l2' /\
+      Permutation (combine l1 l2) (combine l1' l2') /\
+      (* Forall2 still holds *)
+      Forall2 pred l1' l2'.
+Proof.
+  intros.
+    pose proof Permutation_combine_wrt_left l1 l2 l1' as Hi.
+    specialize (Hi (F2_sl H) H0).
+    destruct Hi as [l2' [H_perm_l2' H_perm_combine]].
+    exists l2'.
+    split.
+    - auto.
+    - split; auto.
+      pose proof Permutation_length H_perm_l2'.
+      pose proof Permutation_length H0.
+      pose proof F2_sl H.
+      eapply (Forall2_perm_combine l1 l1' l2 l2'); auto.
+      lia.
+Admitted.
+
 Lemma Forall2_perm_l_exists:
   forall {A B: Type} (l1: list A) (l2: list B) (f: A -> B -> Prop) (l1': list A),
     Permutation l1 l1' ->
@@ -1581,17 +1595,9 @@ Lemma Forall2_perm_l_exists:
     exists l2', Permutation l2 l2' /\ Forall2 f l1' l2'.
 Proof.
   intros.
-  pose proof Permutation_combine_wrt_left l1 l2 l1' as Hi.
-  specialize (Hi (F2_sl H0)).
-  specialize (Hi H).
-  destruct Hi as [l2' [? ?]].
-  exists l2'.
-  split; auto.
-  pose proof Permutation_length H.
-  pose proof Permutation_length H1.
-  pose proof F2_sl H0.
-  apply Forall2_perm_combine with (l1 := l1) (l2 := l2); auto.
-  lia.
+  intros.
+  pose proof combine_permutation_l_exists_holds l1 l2 l1' f H0 H as [l2' [? [? ?]]].
+  exists l2'; repeat split; auto.
 Qed.
 
 Lemma combine_perm_l_exists:
@@ -1605,19 +1611,9 @@ Lemma combine_perm_l_exists:
       Forall2 pred l1' l2'.
 Proof.
   intros.
-  pose proof Permutation_combine_wrt_left l1 l2 l1' as Hi.
-  specialize (Hi (F2_sl H) H0).
-  destruct Hi as [l2' [H_perm_l2' H_perm_combine]].
-  exists l2'.
-  split.
-  - apply Permutation_length.
-    exact H_perm_l2'.
-  - split; auto.
-    pose proof Permutation_length H_perm_l2'.
-    pose proof Permutation_length H0.
-    pose proof F2_sl H.
-    eapply (Forall2_perm_combine l1 l1' l2 l2'); auto.
-    lia.
+  pose proof combine_permutation_l_exists_holds l1 l2 l1' pred H H0 as [l2' [? [? ?]]].
+  exists l2'; repeat split; auto.
+  apply Permutation_length; auto.
 Qed.
 
 
