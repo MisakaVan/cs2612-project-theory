@@ -33,53 +33,6 @@ Proof.
     transitivity (f y); tauto.
 Qed.
 
-Lemma Forall2_to_forall_r:
-  forall {A B: Type} (l1: list A) (l2: list B) (f: A -> B -> Prop),
-    Forall2 f l1 l2 ->
-    (forall b, In b l2 -> exists a, In a l1 /\ f a b).
-Proof.
-  intros.
-  induction H.
-  - inversion H0.
-  - destruct H0.
-    + subst.
-      exists x.
-      split; auto.
-      left; auto.
-    + apply IHForall2 in H0.
-      destruct H0 as [a [? ?]].
-      exists a.
-      split; auto.
-      right; auto.
-Qed.
-
-Lemma Forall2_to_forall_l:
-  forall {A B: Type} (l1: list A) (l2: list B) (f: A -> B -> Prop),
-    Forall2 f l1 l2 ->
-    (forall a, In a l1 -> exists b, In b l2 /\ f a b).
-Proof.
-  intros.
-  induction H.
-  - inversion H0.
-  - destruct H0.
-    + subst.
-      exists y.
-      split; auto.
-      left; auto.
-    + apply IHForall2 in H0.
-      destruct H0 as [b [? ?]].
-      exists b.
-      split; auto.
-      right; auto.
-Qed.
-
-
-Lemma Forall2_perm_r_exists:
-  forall {A B: Type} (l1: list A) (l2: list B) (f: A -> B -> Prop) (l2': list B),
-    Permutation l2 l2' ->
-    Forall2 f l1 l2 ->
-    exists l1', Permutation l1 l1' /\ Forall2 f l1' l2'.
-  Admitted.
 
 (*********************************************************)
 (**                                                      *)
@@ -976,6 +929,19 @@ Proof.
   split; auto.
 Qed.
 
+Lemma Forall2_sym:
+  forall {A B: Type}
+         {pred: A -> B -> Prop}
+         {la: list A} {lb: list B},
+    Forall2 pred la lb ->
+    Forall2 (fun b a => pred a b) lb la.
+Proof.
+  intros.
+  induction H.
+  - constructor.
+  - constructor; auto.
+Qed.
+
 Lemma Forall2_same_length {A B: Type}:
   forall (P: A -> B -> Prop) l1 l2,
     Forall2 P l1 l2 ->
@@ -1022,6 +988,46 @@ Lemma Forall2_in_l_exists:
   forall {A B: Type} (l1: list A) (l2: list B) (f: A -> B -> Prop),
     Forall2 f l1 l2 ->
     forall a, In a l1 -> exists b, In b l2 /\ f a b.
+Proof.
+  intros.
+  induction H.
+  - inversion H0.
+  - destruct H0.
+    + subst.
+      exists y.
+      split; auto.
+      left; auto.
+    + apply IHForall2 in H0.
+      destruct H0 as [b [? ?]].
+      exists b.
+      split; auto.
+      right; auto.
+Qed.
+
+Lemma Forall2_to_forall_r:
+  forall {A B: Type} (l1: list A) (l2: list B) (f: A -> B -> Prop),
+    Forall2 f l1 l2 ->
+    (forall b, In b l2 -> exists a, In a l1 /\ f a b).
+Proof.
+  intros.
+  induction H.
+  - inversion H0.
+  - destruct H0.
+    + subst.
+      exists x.
+      split; auto.
+      left; auto.
+    + apply IHForall2 in H0.
+      destruct H0 as [a [? ?]].
+      exists a.
+      split; auto.
+      right; auto.
+Qed.
+
+Lemma Forall2_to_forall_l:
+  forall {A B: Type} (l1: list A) (l2: list B) (f: A -> B -> Prop),
+    Forall2 f l1 l2 ->
+    (forall a, In a l1 -> exists b, In b l2 /\ f a b).
 Proof.
   intros.
   induction H.
@@ -1776,6 +1782,21 @@ Proof.
   intros.
   pose proof combine_permutation_l_exists_holds l1 l2 l1' f H0 H as [l2' [? [? ?]]].
   exists l2'; repeat split; auto.
+Qed.
+
+Lemma Forall2_perm_r_exists:
+  forall {A B: Type} (l1: list A) (l2: list B) (f: A -> B -> Prop) (l2': list B),
+    Permutation l2 l2' ->
+    Forall2 f l1 l2 ->
+    exists l1', Permutation l1 l1' /\ Forall2 f l1' l2'.
+Proof.
+  intros.
+  assert (Forall2 (fun b a => f a b) l2 l1) as Hf. {
+    apply Forall2_sym; auto.
+  }
+  pose proof combine_permutation_l_exists_holds _ _ _ _ Hf H as [l1' [? [? ?]]].
+  exists l1'; repeat split; auto.
+  apply Forall2_sym; auto.
 Qed.
 
 Lemma combine_perm_l_exists:
