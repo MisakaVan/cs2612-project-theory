@@ -1168,6 +1168,65 @@ Qed.
 
 (** Partition of list *)
 
+
+Lemma Permutation_combine_wrt_left {A B: Type}:
+  forall (l1: list A) (l2: list B) (l1': list A),
+    length l1 = length l2 ->
+    Permutation l1 l1' ->
+    exists l2', 
+      Permutation l2 l2' /\
+      Permutation (combine l1 l2) (combine l1' l2').
+Proof.
+  intros l1 l2 l1' Hlength12 Hperm.
+  revert l2 Hlength12.
+  induction Hperm.
+  - intros l2 Hlength12.
+    assert (l2 = []) by (apply length_zero_iff_nil; auto).
+    subst; simpl in *.
+    exists [].
+    split; auto.
+  - intros l2 Hlength12.
+    destruct l2 as [| b l2]; [inversion Hlength12|].
+    assert (length l = length l2) as Hlength12'.
+    {
+      simpl in Hlength12.
+      lia.
+    }
+    specialize (IHHperm l2 Hlength12').
+    destruct IHHperm as [l2i [Hpermi Hcombinei]].
+    exists (b :: l2i).
+    split; auto.
+    simpl.
+    apply perm_skip.
+    auto.
+  - intros l2 Hlength12.
+    destruct l2 as [| b1 l2]; [inversion Hlength12|].
+    destruct l2 as [| b2 l2]; [inversion Hlength12|]. 
+    assert (length l = length l2) as Hlength12'.
+    {
+      simpl in Hlength12.
+      lia.
+    }
+    exists (b2 :: b1 :: l2).
+    split.
+    + constructor.
+    + simpl.
+      constructor.
+  - intros l2 Hlength12.
+    pose proof IHHperm1 l2 Hlength12 as [l2i1 [Hpermi1 Hcombinei1]].
+    assert (length l' = length l2i1) as Hlength12'.
+    {
+      rewrite <- Hperm1.
+      rewrite <- Hpermi1.
+      auto.
+    }
+    pose proof IHHperm2 l2i1 Hlength12' as [l2i2 [Hpermi2 Hcombinei2]].
+    exists l2i2.
+    split.
+    + transitivity l2i1; auto.
+    + transitivity (combine l' l2i1); auto.
+Qed.
+
 Lemma list_partition_in_notin:
   forall {A: Type} (l t: list A),
     exists t1 t2,
@@ -5498,6 +5557,16 @@ Lemma Permutation_combine_cons:
 Proof.
 Admitted.
 
+Lemma Forall2_perm_combine:
+  forall {A B: Type} l1 l1' l2 l2' (f: A -> B -> Prop),
+    length l1 = length l1' ->
+    length l1' = length l2' ->
+    Forall2 f l1 l2 ->
+    Permutation (combine l1 l2) (combine l1' l2') ->
+    Forall2 f l1' l2'.
+Proof.
+Admitted.
+
 Lemma combine_perm_l_exists:
   forall {A B: Type} (l1: list A) (l2: list B) (l1': list A),
   forall pred, 
@@ -5508,7 +5577,21 @@ Lemma combine_perm_l_exists:
       Permutation (combine l1 l2) (combine l1' l2') /\
       Forall2 pred l1' l2'.
 Proof.
-Admitted.
+  intros.
+  pose proof Permutation_combine_wrt_left l1 l2 l1' as Hi.
+  specialize (Hi (F2_sl H) H0).
+  destruct Hi as [l2' [H_perm_l2' H_perm_combine]].
+  exists l2'.
+  split.
+  - apply Permutation_length.
+    exact H_perm_l2'.
+  - split; auto.
+    pose proof Permutation_length H_perm_l2'.
+    pose proof Permutation_length H0.
+    pose proof F2_sl H.
+    eapply (Forall2_perm_combine l1 l1' l2 l2'); auto.
+    lia.
+Qed.
 
 Lemma list_pair_partition_l_nodup_incl:
   forall {A B: Type} (l1: list A) (l2: list B) (l1flag: list A),
