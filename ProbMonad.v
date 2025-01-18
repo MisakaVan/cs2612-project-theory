@@ -1386,6 +1386,80 @@ Admitted.
 
 (** Partition and permutation of list *)
 
+Lemma app_combine_combine:
+  forall {A B: Type} (l1 l3: list A) (l2 l4: list B),
+    length l1 = length l2 ->
+    length l3 = length l4 ->
+    combine (l1 ++ l3) (l2 ++ l4) = (combine l1 l2) ++ (combine l3 l4).
+Proof.
+  intros.
+  revert l3 l2 l4 H H0.
+  induction l1 as [| a l1 IH].
+  - intros.
+    simpl in *.
+    assert (l2 = []). { destruct l2; auto. inversion H. }
+    subst.
+    simpl.
+    reflexivity.
+  - intros.
+    destruct l2 as [| b l2].
+    + 
+      inversion H.
+    + simpl.
+      f_equal.
+      apply IH.
+      * simpl in H.
+        injection H as H.
+        auto.
+      * simpl in H0.
+        auto.
+Qed.
+
+Lemma combine_fst:
+  forall {A B: Type} (l1: list A) (l2: list B),
+    length l1 = length l2 ->
+    map fst (combine l1 l2) = l1.
+Proof.
+  intros.
+  revert l2 H.
+  induction l1 as [| a l1 IH].
+  - simpl.
+    reflexivity.
+  - intros.
+    destruct l2 as [| b l2].
+    + inversion H.
+    + simpl.
+      f_equal.
+      apply IH.
+      simpl in H.
+      injection H as H.
+      auto.
+Qed.
+
+Lemma combine_snd:
+  forall {A B: Type} (l1: list A) (l2: list B),
+    length l1 = length l2 ->
+    map snd (combine l1 l2) = l2.
+Proof.
+  intros.
+  revert l1 H.
+  induction l2 as [| a l2 IH].
+  - intros.
+    simpl.
+    assert (l1 = []) by (apply length_zero_iff_nil; auto).
+    subst.
+    reflexivity.
+  - intros.
+    destruct l1 as [| b l1].
+    + inversion H.
+    + simpl.
+      f_equal.
+      apply IH.
+      simpl in H.
+      injection H as H.
+      auto.
+Qed.
+
 Lemma Permutation_combine_cons:
   forall {A B: Type} {la: list A} {lb: list B} {la1 lb1 la2 lb2},
     length la = length lb ->
@@ -1395,7 +1469,20 @@ Lemma Permutation_combine_cons:
     Permutation la (la1 ++ la2) /\
     Permutation lb (lb1 ++ lb2).
 Proof.
-Admitted.
+  intros.
+  erewrite <- app_combine_combine in H2; eauto.
+  split.
+  - pose proof Permutation_map fst H2.
+    erewrite combine_fst in H3; eauto.
+    erewrite combine_fst in H3; eauto.
+    repeat rewrite app_length.
+    lia.
+  - pose proof Permutation_map snd H2.
+    erewrite combine_snd in H3; eauto.
+    erewrite combine_snd in H3; eauto.
+    repeat rewrite app_length.
+    lia.
+Qed.
 
 Lemma Forall2_perm_combine:
   forall {A B: Type} l1 l1' l2 l2' (f: A -> B -> Prop),
