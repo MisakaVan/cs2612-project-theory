@@ -73,13 +73,6 @@ Proof.
       right; auto.
 Qed.
 
-Lemma Forall2_perm_l_exists:
-  forall {A B: Type} (l1: list A) (l2: list B) (f: A -> B -> Prop) (l1': list A),
-    Permutation l1 l1' ->
-    Forall2 f l1 l2 ->
-    exists l2', Permutation l2 l2' /\ Forall2 f l1' l2'.
-Proof.
-Admitted.
 
 (*********************************************************)
 (**                                                      *)
@@ -1166,7 +1159,29 @@ Proof.
   auto.
 Qed.
 
-(** Partition of list *)
+(** Partition and permutation of list *)
+
+Lemma Permutation_combine_cons:
+  forall {A B: Type} {la: list A} {lb: list B} {la1 lb1 la2 lb2},
+    length la = length lb ->
+    length la1 = length lb1 ->
+    length la2 = length lb2 ->
+    Permutation (combine la lb) ((combine la1 lb1) ++ (combine la2 lb2)) ->
+    Permutation la (la1 ++ la2) /\
+    Permutation lb (lb1 ++ lb2).
+Proof.
+Admitted.
+
+Lemma Forall2_perm_combine:
+  forall {A B: Type} l1 l1' l2 l2' (f: A -> B -> Prop),
+    length l1 = length l1' ->
+    length l1' = length l2' ->
+    Forall2 f l1 l2 ->
+    Permutation (combine l1 l2) (combine l1' l2') ->
+    Forall2 f l1' l2'.
+Proof.
+Admitted.
+
 
 
 Lemma Permutation_combine_wrt_left {A B: Type}:
@@ -1342,6 +1357,26 @@ Proof.
     pose proof NoDup_cons_iff a t2 as [? _].
     specialize (H6 Ht2).
     tauto.
+Qed.
+
+Lemma Forall2_perm_l_exists:
+  forall {A B: Type} (l1: list A) (l2: list B) (f: A -> B -> Prop) (l1': list A),
+    Permutation l1 l1' ->
+    Forall2 f l1 l2 ->
+    exists l2', Permutation l2 l2' /\ Forall2 f l1' l2'.
+Proof.
+  intros.
+  pose proof Permutation_combine_wrt_left l1 l2 l1' as Hi.
+  specialize (Hi (F2_sl H0)).
+  specialize (Hi H).
+  destruct Hi as [l2' [? ?]].
+  exists l2'.
+  split; auto.
+  pose proof Permutation_length H.
+  pose proof Permutation_length H1.
+  pose proof F2_sl H0.
+  apply Forall2_perm_combine with (l1 := l1) (l2 := l2); auto.
+  lia.
 Qed.
 
 (** Other lemmas *)
@@ -5546,26 +5581,6 @@ Admitted.
 Proof.
 Admitted. *)
 
-Lemma Permutation_combine_cons:
-  forall {A B: Type} {la: list A} {lb: list B} {la1 lb1 la2 lb2},
-    length la = length lb ->
-    length la1 = length lb1 ->
-    length la2 = length lb2 ->
-    Permutation (combine la lb) ((combine la1 lb1) ++ (combine la2 lb2)) ->
-    Permutation la (la1 ++ la2) /\
-    Permutation lb (lb1 ++ lb2).
-Proof.
-Admitted.
-
-Lemma Forall2_perm_combine:
-  forall {A B: Type} l1 l1' l2 l2' (f: A -> B -> Prop),
-    length l1 = length l1' ->
-    length l1' = length l2' ->
-    Forall2 f l1 l2 ->
-    Permutation (combine l1 l2) (combine l1' l2') ->
-    Forall2 f l1' l2'.
-Proof.
-Admitted.
 
 Lemma combine_perm_l_exists:
   forall {A B: Type} (l1: list A) (l2: list B) (l1': list A),
