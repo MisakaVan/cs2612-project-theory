@@ -1278,6 +1278,50 @@ Proof.
   tauto.
 Qed.
 
+Lemma Forall2_in_combine:
+  forall {A B: Type} (l1: list A) (l2: list B) (f: A -> B -> Prop),
+    Forall2 f l1 l2 ->
+    forall a b, In (a, b) (combine l1 l2) -> f a b.
+Proof.
+  intros.
+  induction H.
+  - inversion H0.
+  - simpl in H0.
+    destruct H0.
+    + inversion H0.
+      subst.
+      auto.
+    + apply IHForall2 in H0.
+      auto.
+Qed.
+
+Lemma Forall2_in_combine_inv:
+  forall {A B: Type} (l1: list A) (l2: list B) (f: A -> B -> Prop),
+    length l1 = length l2 ->
+    (forall a b, In (a, b) (combine l1 l2) -> f a b)
+    -> Forall2 f l1 l2.
+Proof.
+  intros A B l1 l2 f Hlen Hf.
+  revert l2 Hlen Hf.
+  induction l1 as [| a l1' IH].
+  - intros.
+    assert (l2 = []) by (destruct l2; auto; inversion Hlen).
+    subst.
+    constructor.
+  - intros.
+    destruct l2 as [| b l2'].
+    + inversion Hlen.
+    + simpl in Hlen.
+      inversion Hlen.
+      constructor.
+      * apply Hf.
+        simpl; left; auto.
+      * apply IH; auto.
+        intros.
+        apply Hf.
+        simpl; right; auto.
+Qed.
+
 Lemma combine_exists:
   forall {A B: Type} (l: list (A * B)),
   exists l1 l2,
@@ -1492,8 +1536,13 @@ Lemma Forall2_perm_combine:
     Permutation (combine l1 l2) (combine l1' l2') ->
     Forall2 f l1' l2'.
 Proof.
-Admitted.
-
+  intros A B l1 l1' l2 l2' f Hlen1 Hlen2 Hf Hperm.
+  eapply Forall2_in_combine_inv; eauto.
+  intros.
+  eapply Forall2_in_combine; eauto.
+  rewrite Hperm.
+  auto.
+Qed.
 
 
 Lemma Permutation_combine_wrt_left {A B: Type}:
