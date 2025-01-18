@@ -4705,17 +4705,92 @@ Proof.
       apply IHHFg. exact H4.
 Qed.
 
+Lemma bind_equiv_l_congr_1:
+  forall {A B: Type} (f1 f2: ProbMonad.M A) (g: A -> ProbMonad.M B),
+    ProbMonad.equiv f1 f2 ->
+    forall d, d ∈ (ProbMonad.bind f1 g).(distr) ->
+              d ∈ (ProbMonad.bind f2 g).(distr).
+Proof.
+  intros A B f1 f2 g H_equiv d.
+  sets_unfold.
+  unfold ProbMonad.equiv in H_equiv.
+  intros Hd.
+  unfold ProbMonad.bind in *; simpl in *.
+  unfold ProbMonad.__bind in *.
+  destruct Hd as [da [lab [Hda [Hlab H_sum_lab]]]].
+  exists da, lab.
+  split; auto.
+  eapply f2.(legal).(Legal_congr).
+  reflexivity.
+  apply H_equiv.
+  exact Hda.
+Qed.
+
+Lemma bind_equiv_l_congr:
+  forall {A B: Type} (f1 f2: ProbMonad.M A) (g: A -> ProbMonad.M B),
+    ProbMonad.equiv f1 f2 ->
+    ProbMonad.equiv (ProbMonad.bind f1 g) (ProbMonad.bind f2 g).
+Proof.
+  intros A B f1 f2 g H_equiv.
+  unfold ProbMonad.equiv in *.
+  sets_unfold.
+  intros.
+  split.
+  - apply bind_equiv_l_congr_1; auto.
+  - apply bind_equiv_l_congr_1; auto.
+    symmetry; auto.
+Qed.
+
+Lemma ProbDistr_from_bind:
+  forall {A B: Type} {f: ProbMonad.M A} {g: A -> ProbMonad.M B}
+    {da: Distr A} {lab: list (R * Distr B)} (d: Distr B),
+    da ∈ f.(distr) ->
+    Forall2 (fun a '(r, d) => r = da.(prob) a /\ d ∈ (g a).(distr)) da.(pset) lab ->
+    ProbDistr.sum_distr lab d ->
+    d ∈ (ProbMonad.bind f g).(distr).
+Proof.
+  intros A B f g da lab d.
+  intros Hda Hlab H_sum_lab.
+  sets_unfold.
+  unfold ProbMonad.bind.
+  unfold ProbMonad.__bind.
+  simpl.
+  exists da, lab.
+  split; auto.
+Qed.
+
 Lemma bind_congruence_step:
-  forall (A: Type) (dx dy: Distr A) (g: A -> ProbMonad.M Prop) 
+  forall (A: Type) (mx my: ProbMonad.M A) (dx dy: Distr A) (g: A -> ProbMonad.M Prop) 
          (lx ly: list (R * Distr Prop)) (dsx dsy: Distr Prop),
-    ProbDistr.equiv dx dy ->
+    ProbMonad.equiv mx my ->
+    dx ∈ mx.(distr) ->
+    dy ∈ my.(distr) ->
     Forall2 (fun a '(r, d) => r = dx.(prob) a /\ d ∈ (g a).(distr)) dx.(pset) lx ->
     Forall2 (fun a '(r, d) => r = dy.(prob) a /\ d ∈ (g a).(distr)) dy.(pset) ly ->
     ProbDistr.sum_distr lx dsx ->
     ProbDistr.sum_distr ly dsy ->
     ProbDistr.equiv dsx dsy.
 Proof.
-Admitted.
+  intros A mx my dx dy g lx ly dsx dsy.
+  intros H_equiv dx_in_mx dy_in_my Hlx Hly.
+  intros H_sum_lx H_sum_ly.
+  assert (dsx ∈ (ProbMonad.bind mx g).(distr)) as Hdx. {
+    eapply ProbDistr_from_bind; eauto.
+  }
+  assert (dsy ∈ (ProbMonad.bind my g).(distr)) as Hdy. {
+    eapply ProbDistr_from_bind; eauto.
+  }
+  assert (ProbMonad.equiv (ProbMonad.bind mx g) (ProbMonad.bind my g)) as H_bind_equiv. {
+    apply bind_equiv_l_congr.
+    exact H_equiv.
+  }
+  unfold ProbMonad.equiv in H_bind_equiv.
+  assert (dsx ∈ (ProbMonad.bind my g).(distr)) as Hdx'. {
+    eapply H_bind_equiv; eauto.
+  }
+  eapply (ProbMonad.bind my g).(legal).(Legal_unique); eauto.
+Qed.
+
 
 (** Level 2 *)
 #[export] Instance ProbMonad_bind_mono_event (A: Type):
@@ -4816,12 +4891,7 @@ Proof.
       ++ exact H_d1.
       ++ exact H_d2.
     - (* show that d2x and d3x are equivalent, using dist1/dist2 equivalence *)
-      eapply (bind_congruence_step A dist1 dist2 fM2 list2 list3 d2x d3x).
-      + exact eqDist12.
-      + exact H_list2.
-      + exact H_list3.
-      + exact H_d2.
-      + exact H_d3.
+      eapply (bind_congruence_step _ dM1 dM2 dist1 dist2 fM2 list2 list3 d2x d3x); eauto.
   }
 
   (* Finally, produce the distributions needed for the main imply_event goal *)
