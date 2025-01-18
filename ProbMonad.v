@@ -4641,9 +4641,9 @@ Proof.
     clear H1.
     destruct (H_sum_distr) as [HQpset HQprob].
     pose proof Permutation_in qa HQpset H3.
-    Search filter_dup.
+    (* Search filter_dup. *)
     pose proof filter_dup_in (concat (map (fun '(_, d) => d.(pset)) lQ)) qa H1.
-    Search (In _ (concat _)).
+    (* Search (In _ (concat _)). *)
     pose proof In_concat_map_exists lQ (fun '(_, d) => d.(pset)) qa H4 as [(r, d) [HinlQ Hd]].
     pose proof Forall2_in_r_exists dA.(pset) lQ 
       (fun (a : A) '(r, d) =>
@@ -4902,7 +4902,7 @@ Proof.
         }
         rewrite Hnthn in H15.
         assert (In (r_t, d_t) lP). {
-          Search (nth).
+          (* Search (nth). *)
           assert (n < length lP)%nat. {
             assert (length lP = length dA.(pset)). {
               pose proof Forall2_same_length _ _ _ H2.
@@ -4963,56 +4963,6 @@ Proof.
       exists a_t.
       split; auto.
     }
-    (* assert (dP.(prob) (P a) > 0)%R. {
-      simpl.
-      unfold dP_prob.
-      assert (In a dA.(pset)) by apply H5.
-      pose proof Forall2_in_l_exists dA.(pset) lP 
-        (fun (a : A) '(r, d0) =>
-          r = dA.(prob) a /\
-          d0.(pset) = [P a] /\
-          d0.(prob) (P a) = 1%R /\
-          (forall b : Prop, P a <> b -> d0.(prob) b = 0%R)) H2 a H6
-        as [(r', d') [HinlP [Hr' ?]]].
-      assert (r = dA.(prob) a) by apply H5.
-      assert (r = r'). {
-        subst.
-        reflexivity.
-      }
-      rewrite <- H9 in HinlP.
-      Search In.
-      pose proof in_exists_remaining_list_perm lP (r, d') HinlP as [lP' ?].
-      assert ((sum (map (fun '(r0, d0) => r0 * d0.(prob) (P a)) lP)) = (sum (map (fun '(r0, d0) => r0 * d0.(prob) (P a)) ((r, d') :: lP'))))%R. {
-        apply sum_congr.
-        Search map.
-        apply (Permutation_map (fun '(r0, d0) => r0 * d0.(prob) (P a))%R).
-        assumption.
-      }
-      rewrite H11.
-      clear H11.
-      simpl.
-      assert (sum (map (fun '(r0, d0) => r0 * d0.(prob) (P a)) lP') >= 0)%R. {
-        (* Search Forall2. *)
-        pose proof Forall2_perm_r_exists dA.(pset) lP 
-          (fun (a : A) '(r, d0) =>
-            r = dA.(prob) a /\
-            d0.(pset) = [P a] /\
-            d0.(prob) (P a) = 1%R /\
-            (forall b : Prop, P a <> b -> d0.(prob) b = 0%R)) ((r, d') :: lP') H10 H2 as [la [Hpermla ?]].
-            inversion H11.
-        pose proof f.(legal).(Legal_legal) dA Hda_in_f as H_legal_f.
-        apply sum_distr_prob_sum_nonneg with (dA := dA) (P := P) (la := l) (lP := lP'); auto.
-      }
-      assert (r * d'.(prob) (P a) > 0)%R. {
-        assert (d'.(prob) (P a) = 1%R) by apply H7.
-        rewrite H12.
-        rewrite H8.
-        pose proof HposQ (Q a) H0.
-        pose proof always_conseq_2 a dA dQ Q lQ Hforall2 H_sum_distr H13 as HnonnegQa.
-        lra.
-      }
-      lra.
-    } *)
     destruct (in_dec eq_dec (P a_t) lPpos) as [Hin | Hnotin].
     + assumption.
     + assert (In (P a_t) (lPzero ++ lPpos)). {
