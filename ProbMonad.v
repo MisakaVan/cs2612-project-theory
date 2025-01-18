@@ -1508,18 +1508,11 @@ Proof.
       reflexivity.
 Qed. 
 
-Lemma list_pair_partition_l:
-  forall {A B: Type} (l1: list A) (l2: list B) (l1flag: list A),
-  forall pred, Forall2 pred l1 l2 -> 
-    exists l1t l1o l2t l2o,
-      (* the two parts hold the Forall2 *)
-      Forall2 pred l1t l2t /\
-      Forall2 pred l1o l2o /\
-      (* pairs are moved together *)
-      Permutation (combine l1 l2) ((combine l1t l2t) ++ (combine l1o l2o)) /\
-      (* partition is make with respect to l1flag *)
-      (forall a, In a l1t -> In a l1flag) /\
-      (forall a, In a l1o -> ~ In a l1flag).
+Lemma Forall2_app_inv_both:
+  forall {A B: Type} (la1 la2: list A) (lb1 lb2: list B) (f: A -> B -> Prop),
+    length la1 = length lb1 ->
+    Forall2 f (la1 ++ la2) (lb1 ++ lb2) ->
+    Forall2 f la1 lb1 /\ Forall2 f la2 lb2.
 Proof.
 Admitted.
 
@@ -1623,6 +1616,16 @@ Proof.
     repeat rewrite app_length.
     lia.
 Qed.
+
+Lemma combine_app_eq:
+  forall {A B: Type} {la: list A} {lb: list B} {la1 lb1 la2 lb2},
+    length la = length lb ->
+    length la1 = length lb1 ->
+    length la2 = length lb2 ->
+    combine la lb = (combine la1 lb1) ++ (combine la2 lb2) <->
+    la = la1 ++ la2 /\ lb = lb1 ++ lb2.
+Proof.
+Admitted.
 
 Lemma Forall2_perm_combine:
   forall {A B: Type} l1 l1' l2 l2' (f: A -> B -> Prop),
@@ -1771,6 +1774,95 @@ Proof.
     discriminate.
 Qed.
 
+Lemma list_pair_exists_combine:
+  forall {A B: Type} (l: list (A * B)),
+    exists la lb,
+      l = combine la lb /\
+      length la = length lb.
+Proof.
+Admitted.
+
+Lemma In_combine_l_inv:
+  forall {A B: Type} (l1: list A) (l2: list B) (a: A),
+    length l1 = length l2 ->
+    In a l1 ->
+    exists b, In (a, b) (combine l1 l2).
+Proof.
+Admitted.
+
+Lemma list_pair_partition_l:
+  forall {A B: Type} (l1: list A) (l2: list B) (l1flag: list A),
+  forall pred, Forall2 pred l1 l2 -> 
+    exists l1t l1o l2t l2o,
+      (* the two parts hold the Forall2 *)
+      Forall2 pred l1t l2t /\
+      Forall2 pred l1o l2o /\
+      (* pairs are moved together *)
+      Permutation (combine l1 l2) ((combine l1t l2t) ++ (combine l1o l2o)) /\
+      (* partition is make with respect to l1flag *)
+      (forall a, In a l1t -> In a l1flag) /\
+      (forall a, In a l1o -> ~ In a l1flag).
+Proof.
+  intros.
+  remember (fun x: A * B => let (a, _) := x in if in_dec eq_dec a l1flag then true else false) as f.
+  pose proof list_partition_condition (combine l1 l2) f as [lt [lo [Hperm [Hl1t Hl1o]]]].
+  pose proof list_pair_exists_combine lt as [l1t [l2t [Hcombt Hlent]]].
+  pose proof list_pair_exists_combine lo as [l1o [l2o [Hcombo Hleno]]].
+
+  exists l1t, l1o, l2t, l2o.
+  subst lt lo.
+  assert (combine l1t l2t ++ combine l1o l2o = combine (l1t ++ l1o) (l2t ++ l2o)) as Hcombt.
+  {
+    rewrite app_combine_combine; auto.
+  }
+  rewrite Hcombt in Hperm.
+  assert (Forall2 pred (l1t ++ l1o) (l2t ++ l2o)) as Hf.
+  {
+    eapply Forall2_perm_combine.
+    3: apply H.
+    pose proof F2_sl H as Hlen12.
+    pose proof Permutation_length Hperm as Hlen_to12.
+    pose proof combine_same_length Hlent.
+    pose proof combine_same_length Hleno.
+    pose proof combine_same_length Hlen12.
+    pose proof app_length (combine l1t l2t) (combine l1o l2o).
+    rewrite Hcombt in H3.
+    all: try repeat rewrite app_length.
+    all: try lia.
+    symmetry; auto.
+  }
+  repeat split.
+  - pose proof Forall2_app_inv_both _ _ _ _ _ Hlent Hf.
+    tauto.
+  - pose proof Forall2_app_inv_both _ _ _ _ _ Hlent Hf.
+    tauto.
+  - rewrite <- Hperm.
+    rewrite Hcombt.
+    reflexivity.
+  - intros a H_a_in_l1t.
+    pose proof In_combine_l_inv _ _ _ Hlent H_a_in_l1t as [b H_in_comb].
+    pose proof Hl1t _ H_in_comb.
+    destruct (in_dec eq_dec a l1flag); auto.
+    exfalso.
+    assert (f (a, b) = false) as Hf'. {
+      subst.
+      destruct (in_dec eq_dec a l1flag); auto.
+      contradiction.
+    }
+    rewrite Hf' in H0.
+    discriminate.
+  - intros a H_a_in_l1o.
+    pose proof In_combine_l_inv _ _ _ Hleno H_a_in_l1o as [b H_in_comb].
+    pose proof Hl1o _ H_in_comb.
+    destruct (in_dec eq_dec a l1flag); auto.
+    exfalso.
+    assert (f (a, b) = true) as Hf'. {
+      subst.
+      destruct (in_dec eq_dec a l1flag); auto.
+    }
+    rewrite Hf' in H0.
+    discriminate.
+Qed.
 
 Lemma NoDup_partition_singleton:
   forall {A: Type} (l: list A) (a: A),
