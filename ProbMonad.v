@@ -3580,14 +3580,46 @@ Lemma sum_map_split_two_lists:
   forall {A: Type} (l: list A) (f: A -> R) (l1 l2: list A),
     l = l1 ++ l2 ->
     (sum (map f l) = sum (map f l1) + sum (map f l2))%R.
-Admitted.
+Proof.
+  intros.
+  subst.
+  rewrite map_app.
+  rewrite sum_app.
+  reflexivity.
+Qed.
 
 Lemma all_nonneg_list_pos_exists_pos_element:
   forall (l: list R),
     (forall r, In r l -> r >= 0)%R ->
     (sum l > 0)%R ->
     exists r_pos, In r_pos l /\ (r_pos > 0)%R.
-Admitted.
+Proof.
+  induction l as [| r l IH].
+  - intros.
+    simpl in H0.
+    lra.
+  - intros.
+    simpl in H0.
+    assert (r >= 0)%R. {
+      apply H.
+      left; auto.
+    }
+    destruct (Rlt_dec 0 r).
+    + exists r.
+      split; auto.
+      left; auto.
+    + assert (r = 0)%R by lra.
+      assert (sum l > 0)%R by lra.
+      assert (forall r : R, In r l -> (r >= 0)%R). {
+        intros.
+        apply H.
+        right; auto.
+      }
+      specialize (IH H4 H3) as [r_pos [Hin Hpos]].
+      exists r_pos.
+      split; auto.
+      right; auto.
+Qed.
 
 Lemma NoDup_app_disjoint :
   forall (A : Type) (l1 l2 : list A),
