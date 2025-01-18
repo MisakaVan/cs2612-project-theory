@@ -4064,76 +4064,7 @@ Proof.
         rewrite H4.
         lra.
 Qed.
-        
-(* Lemma sum_distr_prob_nonneg:
-  forall {A: Type} (dA: Distr A) (dP: Distr Prop) (P: A -> Prop) (lP: list (R * Distr Prop)),
-    ProbDistr.legal dA ->
-    Forall2
-      (fun (a : A) '(r, d0) =>
-      r = dA.(prob) a /\
-      d0.(pset) = [P a] /\
-      d0.(prob) (P a) = 1%R /\
-      (forall b : Prop, P a <> b -> d0.(prob) b = 0%R))
-    dA.(pset) lP ->
-    ProbDistr.sum_distr lP dP ->
-    (forall a, In a dA.(pset) -> dP.(prob) (P a) >= 0)%R.
-Proof.
-  intros A dA.
-  induction dA.(pset) as [| a1 l IH].
-  - intros.
-    contradiction.
-  - intros.
-    destruct lP as [| [r d] lP'].
-    + inversion H0.
-    + inversion H0.
-      subst.
-      destruct H1 as [Hpset Hprob].
-      simpl in Hprob.
-      set (dP'_pset := filter_dup (concat (map (fun '(_, d) => d.(pset)) lP'))).
-      set (dP'_prob := fun Pa => sum (map (fun '(r0, d) => (r0 * d.(prob) Pa)%R) lP')).
-      set (dP' := {| ProbDistr.pset := dP'_pset; ProbDistr.prob := dP'_prob; |}).
-      assert (ProbDistr.sum_distr lP' dP') as H_sum_dP'. {
-        split; auto.
-      }
-      assert (r >= 0)%R. {
-        destruct H as [? ? ? ?].
-        specialize (legal_nonneg a1).
-        assert (r = dA.(prob) a1) by apply H6.
-        lra.
-      }
-      assert (r * d.(prob) (P a) >= 0)%R. {
-        destruct (eq_dec (P a) (P a1)) as [Heq | Hneq].
-        - assert (d.(prob) (P a1) = 1%R) by apply H6.
-          rewrite <- Heq in H3.
-          rewrite H3.
-          lra.
-        - assert (d.(prob) (P a) = 0%R). {
-            apply H6.
-            auto.
-          }
-          rewrite H3.
-          lra.
-      }
-      destruct H2.
-      * subst a.
-        specialize (Hprob (P a1)).
-        assert (r = dA.(prob) a1) by apply H6.
-        assert (d.(prob) (P a1) = 1%R) by apply H6.
-        rewrite H2, H4 in Hprob.
-        assert (sum (map (fun '(r, d) => r * d.(prob) (P a1)) lP') >= 0)%R. {
-          
-          apply sum_distr_prob_sum_nonneg with (dA := dA) (dP := dP') (P := P) (lP := lP'); auto.
-        }
-        rewrite Hprob, <- H2.
-        lra.
-      * specialize (IH dP' P lP' H H8 H_sum_dP' a H2).
-        unfold dP' in IH.
-        simpl in IH.
-        unfold dP'_prob in IH.
-        specialize (Hprob (P a)).
-        
-        lra.
-  Admitted. *)
+
 
 Lemma split_zero_and_pos_from_nonneg_list:
   forall {A: Type} (l: list A) (f: A -> R) (r: R),
