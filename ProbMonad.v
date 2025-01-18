@@ -956,6 +956,19 @@ Qed.
 
 (** Forall2 *)
 
+Lemma Forall2_inv:
+  forall {A B: Type}
+         {pred: A -> B -> Prop}
+         {la: list A} {lb: list B}
+         {a: A} {b: B},
+    Forall2 pred (a :: la) (b :: lb) ->
+    pred a b /\ Forall2 pred la lb.
+Proof.
+  intros.
+  inversion H.
+  split; auto.
+Qed.
+
 Lemma Forall2_same_length {A B: Type}:
   forall (P: A -> B -> Prop) l1 l2,
     Forall2 P l1 l2 ->
@@ -4283,6 +4296,7 @@ Proof.
     specialize (IH (zero_list ++ pos_list') f (r - (f a))%R H6 H0 H7 H8 H9).
     destruct (in_dec eq_dec a subl) as [Hin | Hnotin].
     + pose proof in_split a subl Hin as [subl1 [subl2 ?]].
+      rewrite H10.
   Admitted. 
     
 Lemma always_conseq_1:
@@ -4912,22 +4926,93 @@ Proof.
       * constructor; auto.
       * constructor; auto.
 Qed.
-    
+
+
+(* list_r list_d dA f Hlena Hlist_r Hlist_d. 
+  assert (length dA.(pset) = length list_r) as Hlen. {
+    rewrite Hlist_r.
+    symmetry.
+    apply map_length.
+  }
+
+  pose proof F2_sl Hlist_d as Hlen2.
+*)
+Lemma combine_rd_induction:
+  forall {A: Type} (n: nat) (list_r: list R) (list_d: list (Distr Prop)) (dA: Distr A) (f: A -> ProbMonad.M Prop),
+    length dA.(pset) <= n ->
+    list_r = map dA.(prob) dA.(pset) ->
+    Forall2 (fun (a : A) (d : Distr Prop) => (f a).(distr) d) dA.(pset) list_d -> 
+    Forall2 (fun (a : A) '(r, d) => r = dA.(prob) a /\ (f a).(distr) d) dA.(pset) (combine list_r list_d).
+Proof.
+  intros A n.
+  induction n.
+  {
+    intros list_r list_d dA f Hlena Hlist_r Hlist_d. 
+    assert (length dA.(pset) = length list_r) as Hlen. {
+      rewrite Hlist_r.
+      symmetry.
+      apply map_length.
+    }
+    pose proof F2_sl Hlist_d as Hlen2.
+    assert (length dA.(pset) = 0) by lia.
+    assert (length list_r = 0) by lia.
+    assert (length list_d = 0) by lia.
+    assert (dA.(pset) = []) by (apply length_zero_iff_nil; auto).
+    assert (list_r = []) by (apply length_zero_iff_nil; auto).
+    assert (list_d = []) by (apply length_zero_iff_nil; auto).
+    rewrite H2, H3, H4.
+    simpl; constructor.
+  }
+  {
+    intros list_r list_d dA f Hlena Hlist_r Hlist_d. 
+    assert (length dA.(pset) = length list_r) as Hlen. {
+      rewrite Hlist_r.
+      symmetry.
+      apply map_length.
+    }
+  
+    pose proof F2_sl Hlist_d as Hlen2.
+    destruct (classic (length dA.(pset) = S n)) as [Hlen' | Hlen'].
+    - assert (length list_r = S n) as Hir by lia.
+      assert (length list_d = S n) as Hid by lia.
+      destruct dA.(pset) as [|a dapset']; [inversion Hlen' |].
+      destruct list_r as [|r list_r']; [inversion Hir |].
+      destruct list_d as [|d list_d']; [inversion Hid |].
+      inversion Hlen'.
+      pose proof Forall2_inv Hlist_d as [Hi1 Hi2].
+      simpl in Hlist_r.
+      inversion Hlist_r.
+      simpl.
+      constructor.
+      + split; auto.
+      + specialize (IHn list_r' list_d').
+        specialize (IHn {|
+          ProbDistr.pset := dapset';
+          ProbDistr.prob := dA.(prob);
+        |}).
+        simpl in IHn.
+        specialize (IHn f).
+        assert (length dapset' <= n) as Hlenapset'. {
+          lia.
+        }
+        specialize (IHn Hlenapset' H2 Hi2).
+        subst.
+        apply IHn.
+
+    - assert (length dA.(pset) <= n) as Hlenapset by lia.
+      apply IHn; auto.
+  }
+Qed.
+
 Lemma combine_rd:
   forall {A: Type} (list_r: list R) (list_d: list (Distr Prop)) (dA: Distr A) (f: A -> ProbMonad.M Prop),
     list_r = map dA.(prob) dA.(pset) ->
     Forall2 (fun (a : A) (d : Distr Prop) => (f a).(distr) d) dA.(pset) list_d -> 
     Forall2 (fun (a : A) '(r, d) => r = dA.(prob) a /\ (f a).(distr) d) dA.(pset) (combine list_r list_d).
 Proof.
-  intros.
-  induction H0.
-  - assert (list_r = nil) as Hnil. {
-      auto.
-    }
-    subst.
-    constructor.
-  - simpl in H.
-Admitted.
+  intros A list_r list_d dA f Hlist_r Hlist_d.
+  apply combine_rd_induction with (n := length dA.(pset)); auto.
+Qed.
 
 Lemma exists_lx_ly:
   forall {A: Type} (dA: Distr A) (f : A -> ProbMonad.M Prop) (g : A -> ProbMonad.M Prop),
@@ -7255,19 +7340,6 @@ Proof.
     }
     rewrite H_func_eq.
     reflexivity.
-Qed.
-
-Lemma Forall2_inv:
-  forall {A B: Type}
-         {pred: A -> B -> Prop}
-         {la: list A} {lb: list B}
-         {a: A} {b: B},
-    Forall2 pred (a :: la) (b :: lb) ->
-    pred a b /\ Forall2 pred la lb.
-Proof.
-  intros.
-  inversion H.
-  split; auto.
 Qed.
 
 
