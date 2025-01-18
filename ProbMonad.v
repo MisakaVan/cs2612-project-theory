@@ -1514,7 +1514,32 @@ Lemma Forall2_app_inv_both:
     Forall2 f (la1 ++ la2) (lb1 ++ lb2) ->
     Forall2 f la1 lb1 /\ Forall2 f la2 lb2.
 Proof.
-Admitted.
+  intros A B la1 la2 lb1 lb2 f Hlen1 Happ.
+  pose proof F2_sl Happ as Hlenab.
+  repeat rewrite app_length in Hlenab.
+  assert (length la2 = length lb2) as Hlen2 by lia.
+  clear Hlenab.
+  revert lb1 lb2 Hlen1 Hlen2 Happ.
+  induction la1 as [| a la1' IH].
+  - intros.
+    assert (lb1 = []) by (apply length_zero_iff_nil; auto).
+    subst.
+    split.
+    + constructor.
+    + auto.
+  - intros.
+    destruct lb1 as [| b lb1'].
+    + inversion Hlen1.
+    + simpl in Happ.
+      pose proof Forall2_inv Happ as [Hab Happ'].
+      assert (length la1' = length lb1') as Hlen1' by 
+        (inversion Hlen1; auto).
+      specialize (IH _ _ Hlen1' Hlen2 Happ').
+      destruct IH as [Hla1 Hla2].
+      split.
+      * constructor; auto.
+      * auto.
+Qed.
 
 
 (** Partition and permutation of list *)
