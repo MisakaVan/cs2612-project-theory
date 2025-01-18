@@ -5582,35 +5582,6 @@ Proof.
   apply combine_rd_induction with (n := length dA.(pset)); auto.
 Qed.
 
-Lemma exists_lx_ly:
-  forall {A: Type} (dA: Distr A) (f : A -> ProbMonad.M Prop) (g : A -> ProbMonad.M Prop),
-  (forall a : A,
-    exists d1 d2 : Distr Prop,
-      (f a).(distr) d1 /\
-      (g a).(distr) d2 /\ ProbDistr.imply_event d1 d2) ->
-    exists lx ly,
-      Forall2 (fun (a : A) '(r, d) => r = dA.(prob) a /\ (f a).(distr) d) dA.(pset) lx /\
-      Forall2 (fun (a : A) '(r, d) => r = dA.(prob) a /\ (g a).(distr) d) dA.(pset) ly /\
-      Forall2 (fun '(rx, dx) '(ry, dy) => rx = ry /\ ProbDistr.imply_event dx dy) lx ly.
-Proof.
-  intros.
-  set (list_r := map dA.(prob) dA.(pset)).
-  assert (
-    forall a : A, In a dA.(pset) ->
-    exists d1 d2 : Distr Prop,
-      (f a).(distr) d1 /\
-      (g a).(distr) d2 /\ ProbDistr.imply_event d1 d2) as H'. {
-    intros.
-    apply H.
-  }
-  pose proof exists_d_in_l dA f g H' as [list_d_x [list_d_y [Hldx [Hldy H_d_imp]]]].
-  exists (combine list_r list_d_x), (combine list_r list_d_y).
-  repeat split.
-  - apply combine_rd; auto.
-  - apply combine_rd; auto.
-  - admit.
-Admitted.
-
 Lemma sum_distr_imply_imply:
   forall dx dy lx ly,
     ProbDistr.sum_distr lx dx ->
