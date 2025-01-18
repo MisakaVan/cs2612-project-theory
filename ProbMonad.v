@@ -1364,6 +1364,66 @@ Proof.
     reflexivity.
 Qed.
 
+Lemma combine_same_length:
+  forall {A B: Type} {l1: list A} {l2: list B},
+    length l1 = length l2 ->
+    length (combine l1 l2) = length l1.
+Proof.
+  intros.
+  revert l2 H.
+  induction l1 as [| a l1 IH].
+  - intros.
+    destruct l2 as [| b l2].
+    + reflexivity.
+    + inversion H.
+  - intros.
+    destruct l2 as [| b l2].
+    + inversion H.
+    + simpl.
+      f_equal.
+      apply IH.
+      simpl in H.
+      injection H as H.
+      auto.
+Qed.
+
+Lemma In_combine_combine_common_l:
+  forall {A B C: Type} (l1: list A) (l2: list B) (l3: list C) a a' b c,
+    length l1 = length l2 ->
+    length l1 = length l3 ->
+    In ((a, b), (a', c)) (combine (combine l1 l2) (combine l1 l3)) ->
+    a = a'.
+Proof.
+  intros A B C l1 l2 l3 a a' b c Hlen12 Hlen13 H.
+  assert (length (combine l1 l2) = length l1) as Hlen1 by (apply combine_same_length; auto).
+  assert (length (combine l1 l3) = length l1) as Hlen2 by (apply combine_same_length; auto).
+  assert (length (combine l1 l2) = length (combine l1 l3)) as Hlen by (rewrite Hlen1, Hlen2; auto).
+  remember ((a, b), (a, c)) as tuple.
+  pose proof In_nth _ _ tuple H as [n [Hn Hnth]].
+  pose proof combine_nth as Hcomb.
+  destruct tuple as [tl tr].
+  pose proof (Hcomb _ _ _ _ n tl tr Hlen) as Hcomb'.
+  rewrite Hcomb in Hnth.
+  2: auto.
+  inversion Hnth.
+  destruct tl as [a1 b1].
+  destruct tr as [a2 c1].
+  pose proof (Hcomb _ _ _ _ n a1 b1 Hlen12) as Hcomb1.
+  pose proof (Hcomb _ _ _ _ n a2 c1 Hlen13) as Hcomb2.
+  rewrite Hcomb1 in H1.
+  rewrite Hcomb2 in H2.
+  inversion H1.
+  inversion H2.
+  clear Hcomb1 Hcomb2 Hcomb Hcomb' H1 H2 H3 H4 H5 H6 Heqtuple Hnth.
+  assert (n < length l1) as Hnlen. {
+    pose proof combine_same_length Hlen12.
+    pose proof combine_same_length Hlen.
+    lia.
+  }
+  apply nth_indep.
+  auto.
+Qed.
+
 
 Lemma combine_Forall2:
   forall {A B C: Type} (l1: list A) (l2: list B) (l3: list C) (f: A -> B -> C -> Prop),
@@ -1375,8 +1435,18 @@ Lemma combine_Forall2:
       f a b c ) ->
     Forall2 (fun '(a, b) '(a', c) => a=a' /\ f a b c) (combine l1 l2) (combine l1 l3).
 Proof.
-Admitted.
-      
+  intros.
+  apply Forall2_in_combine_inv.
+  - repeat rewrite combine_same_length; auto.
+  - intros [a b] [a' c] H_in.
+    pose proof In_combine_combine_common_l _ _ _ _ _ _ _ H H0 H_in as H_eq.
+    split.
+    + auto.
+    + pose proof in_combine_l _ _ _ _ H_in as H_in1.
+      pose proof in_combine_r _ _ _ _ H_in as H_in2.
+      rewrite <- H_eq in H_in2.
+      apply H1; auto.
+Qed.
 
 #[export] Instance incl_perm_congr {A: Type}:
   Proper (Permutation (A:=A) ==> Permutation (A:=A) ==> iff) (incl (A:=A)).
