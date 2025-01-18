@@ -237,6 +237,7 @@ Qed.
 (**                                                      *)
 (*********************************************************)
 
+(** filter_dup  *)
 
 (* use ListSet to define *)
 
@@ -314,22 +315,6 @@ Proof.
           apply IH.
           auto.
         }
-Qed.
-
-Lemma Permutation_filter_dup_filter_dup_incl_inv:
-  forall {A: Type} (l1 l2: list A),
-    (forall x, In x l1 <-> In x l2) ->
-    Permutation (filter_dup l1) (filter_dup l2).
-Proof.
-  intros.
-  apply NoDup_Permutation.
-  - apply filter_dup_nodup.
-  - apply filter_dup_nodup.
-  - intros.
-    specialize (filter_dup_incl l1 x).
-    specialize (filter_dup_incl l2 x).
-    specialize (H x).
-    tauto.
 Qed.
 
 Lemma filter_dup_in {A: Type}:
@@ -448,6 +433,24 @@ Proof.
       reflexivity.
 Qed.
 
+(** filter_dup and Permutation  *)
+
+Lemma Permutation_filter_dup_filter_dup_incl_inv:
+  forall {A: Type} (l1 l2: list A),
+    (forall x, In x l1 <-> In x l2) ->
+    Permutation (filter_dup l1) (filter_dup l2).
+Proof.
+  intros.
+  apply NoDup_Permutation.
+  - apply filter_dup_nodup.
+  - apply filter_dup_nodup.
+  - intros.
+    specialize (filter_dup_incl l1 x).
+    specialize (filter_dup_incl l2 x).
+    specialize (H x).
+    tauto.
+Qed.
+
 Lemma perm_filter_dup_cons {A: Type}:
   forall (l l1 l2: list A),
     Permutation (filter_dup l1) (filter_dup l2) ->
@@ -546,6 +549,197 @@ Proof.
   tauto.
 Qed.
 
+Definition perm_filter_dup {A: Type} (l1 l2: list A): Prop :=
+  Permutation (filter_dup l1) (filter_dup l2).
+
+#[export] Instance eq_perm_filter_dup {A: Type}:
+  Equivalence (@perm_filter_dup A).
+Proof.
+  unfold perm_filter_dup.
+  apply equiv_in_domain.
+  split.
+  - unfold Reflexive.
+    reflexivity.
+  - unfold Symmetric.
+    symmetry; auto.
+  - unfold Transitive.
+    intros.
+    transitivity y.
+    all: auto.
+Qed.
+
+Lemma perm_filter_dup_perm {A: Type}:
+  forall (l1 l2: list A),
+    Permutation l1 l2 ->
+    perm_filter_dup l1 l2.
+Proof.
+  intros.
+  apply perm_filter_dup_incl.
+  intros.
+  split; eapply Permutation_in; [| symmetry]; auto.
+Qed.
+
+Lemma perm_filter_dup_app_sym {A: Type}:
+  forall (l1 l2: list A),
+    perm_filter_dup (l1 ++ l2) (l2 ++ l1).
+Proof.
+  intros.
+  enough (Permutation (l1 ++ l2) (l2 ++ l1)). {
+    apply perm_filter_dup_perm.
+    auto.
+  }
+  apply Permutation_app_comm.
+Qed.
+
+Lemma perm_filter_dup_app_comm {A: Type}:
+  forall (l1 l2 l3: list A),
+    perm_filter_dup (l1 ++ l2 ++ l3) ((l1 ++ l2) ++ l3).
+Proof.
+  intros.
+  enough (Permutation (l1 ++ l2 ++ l3) ((l1 ++ l2) ++ l3)). {
+    apply perm_filter_dup_perm.
+    auto.
+  }
+  rewrite app_assoc.
+  reflexivity.
+Qed.
+
+Lemma perm_filter_dup_app_perm_l:
+  forall {A: Type} (l1 l2 l0: list A),
+    Permutation l1 l2 ->
+    perm_filter_dup (l1 ++ l0) (l2 ++ l0).
+Proof.
+  intros.
+  enough (Permutation (l1 ++ l0) (l2 ++ l0)). {
+    apply perm_filter_dup_perm.
+    auto.
+  }
+  apply Permutation_app_tail.
+  auto.
+Qed.
+
+Lemma perm_filter_dup_app_perm_r:
+  forall {A: Type} (l1 l2 l0: list A),
+    Permutation l1 l2 ->
+    perm_filter_dup (l0 ++ l1) (l0 ++ l2).
+Proof.
+  intros.
+  transitivity (l1 ++ l0).
+  apply perm_filter_dup_app_sym.
+  transitivity (l2 ++ l0).
+  apply perm_filter_dup_app_perm_l; auto.
+  apply perm_filter_dup_app_sym.
+Qed.
+
+Lemma filter_dup_twice:
+  forall {A: Type} (l: list A),
+    Permutation (filter_dup (filter_dup l)) (filter_dup l).
+Proof.
+  intros.
+  apply perm_filter_dup_incl.
+  intros.
+  symmetry.
+  apply filter_dup_in_iff.
+Qed.
+
+Lemma perm_filter_dup_app_filter_dup_r:
+  forall {A: Type} (l1 l2: list A),
+    perm_filter_dup (l1 ++ l2) (l1 ++ filter_dup l2).
+Proof.
+  intros.
+  induction l1 as [| a l1 IH].
+  - simpl.
+    unfold perm_filter_dup.
+    symmetry.
+    apply filter_dup_twice.
+  - simpl.
+    unfold perm_filter_dup in *.
+    pose proof perm_filter_dup_incl_inv _ _ IH as IH0.
+    apply perm_filter_dup_incl.
+    intros.
+    split.
+    + intros.
+      simpl in H.
+      destruct H.
+      * subst.
+        left.
+        reflexivity.
+      * right.
+        apply IH0.
+        auto.
+    + intros.
+      simpl.
+      destruct H.
+      * subst.
+        left.
+        reflexivity.
+      * right.
+        apply IH0.
+        auto.
+Qed.
+
+(* 
+  Permutation (filter_dup (concat l1)) (filter_dup (concat l2))
+  holds if l1 and l2 satisfy the following condition:
+  Forall2 (fun lx ly => Permutation lx ly) l1 l2.
+*)
+Lemma Permutation_filter_dup_concat_congr {A: Type}:
+  forall (l1 l2: list (list A)),
+    Forall2 (fun a b => Permutation a b) l1 l2 ->
+    perm_filter_dup (concat l1) (concat l2).
+Proof.
+  intros.
+  induction H.
+  - simpl.
+    reflexivity.
+  - simpl.
+    transitivity (y ++ concat l).
+    apply perm_filter_dup_app_perm_l; auto.
+    transitivity (y ++ filter_dup (concat l)).
+    apply perm_filter_dup_app_filter_dup_r.
+    symmetry.
+    transitivity (y ++ filter_dup (concat l')).
+    apply perm_filter_dup_app_filter_dup_r.
+    apply perm_filter_dup_app_perm_r.
+    unfold perm_filter_dup in IHForall2.
+    symmetry.
+    apply IHForall2.
+Qed.
+
+Lemma perm_filter_dup_concat_perm:
+  forall {A: Type} (l1 l2: list (list A)),
+    Permutation l1 l2 ->
+    perm_filter_dup (concat l1) (concat l2).
+Proof.
+  intros.
+  induction H.
+  - simpl.
+    reflexivity.
+  - simpl.
+    transitivity (x ++ filter_dup (concat l)).
+    apply perm_filter_dup_app_filter_dup_r.
+    symmetry.
+    transitivity (x ++ filter_dup (concat l')).
+    apply perm_filter_dup_app_filter_dup_r.
+    apply perm_filter_dup_app_perm_r.
+    symmetry.
+    apply IHPermutation.
+  - simpl.
+    rewrite perm_filter_dup_app_comm.
+    rewrite perm_filter_dup_app_comm at 1.
+    transitivity ((y ++ x) ++ filter_dup (concat l)).
+    apply perm_filter_dup_app_filter_dup_r.
+    transitivity ((x ++ y) ++ filter_dup (concat l)).
+    2: symmetry; apply perm_filter_dup_app_filter_dup_r.
+    apply perm_filter_dup_app_perm_l.
+    apply Permutation_app_comm.
+  - transitivity (concat l').
+    all: auto.
+Qed.
+
+
+(** NoDup  *)
+
 Lemma nodup_app_l {A: Type}:
   forall (l1 l2: list A),
     NoDup (l1 ++ l2) ->
@@ -607,6 +801,24 @@ Proof.
   tauto.
 Qed.
 
+
+Lemma incl_nodup_perm:
+  forall {A: Type} (l1 l2: list A),
+    NoDup l1 ->
+    NoDup l2 ->
+    incl l1 l2 ->
+    incl l2 l1 ->
+    Permutation l1 l2.
+Proof.
+  intros.
+  apply NoDup_Permutation; auto.
+  intros.
+  unfold incl in *.
+  split; intros.
+  - auto.
+  - auto.
+Qed.
+
 Lemma in_listlist_concat_incl {A: Type}:
   forall (l: list A) (ll: list (list A)),
     In l ll ->
@@ -619,6 +831,10 @@ Proof.
   exists l.
   split; auto.
 Qed.
+
+
+
+(** Permutation and map *)
 
 Definition perm_after_map {A B: Type} (f: A -> B) (l1 l2: list A): Prop :=
   Permutation (map f l1) (map f l2).
@@ -668,6 +884,10 @@ Proof.
   - apply perm_after_map_perm with (l1 := y) (l3 := y0); auto.
     all: symmetry; auto.
 Qed.
+
+
+
+(** Forall2 *)
 
 Lemma Forall2_same_length {A B: Type}:
   forall (P: A -> B -> Prop) l1 l2,
@@ -872,6 +1092,127 @@ Proof.
   auto.
 Qed.
 
+(** Partition of list *)
+
+Lemma list_partition_in_notin:
+  forall {A: Type} (l t: list A),
+    exists t1 t2,
+      Permutation (t1 ++ t2) t /\
+      (forall a, In a t1 -> In a l) /\
+      (forall a, In a t2 -> ~ In a l).
+Proof.
+  intros.
+  exists (filter (fun a => if in_dec eq_dec a l then true else false) t),
+         (filter (fun a => if in_dec eq_dec a l then false else true) t).
+  split.
+  - induction t.
+    + simpl.
+      reflexivity.
+    + simpl.
+      destruct (in_dec eq_dec a l).
+      * simpl.
+        rewrite IHt.
+        reflexivity.
+      * simpl.
+        (* Search (Permutation (_ ++ _)). *)
+        rewrite Permutation_app_comm.
+        simpl.
+        apply Permutation_cons; [reflexivity | auto].
+        rewrite Permutation_app_comm.
+        apply IHt.
+  - split; intros.
+    + apply filter_In in H.
+      destruct H.
+      destruct (in_dec eq_dec a l).
+      * auto.
+      * inversion H0.
+    + apply filter_In in H.
+      destruct H.
+      destruct (in_dec eq_dec a l).
+      * inversion H0.
+      * auto.
+Qed.
+
+
+Lemma NoDup_partition_singleton:
+  forall {A: Type} (l: list A) (a: A),
+    NoDup l ->
+    In a l ->
+    exists l', 
+      Permutation l ([a] ++ l') /\
+      ~ In a l'.
+Proof.
+  intros.
+  pose proof list_partition_in_notin [a] l as [t1 [t2 [? [? ?]]]].
+  exists t2.
+  pose proof perm_nodup_app_l _ _ _ H1 H.
+  pose proof perm_nodup_app_r _ _ _ H1 H.
+  assert (t1 = [a]). {
+    simpl in *.
+    assert (forall a1, In a1 t1 -> a1 = a). {
+      intros; pose proof H2 a1 H6.
+      destruct H7; auto.
+      contradiction.
+    }
+    destruct t1 as [| a1 t1].
+    - (* if t1 is nil, then a must be in t2, which contradicts *) 
+      exfalso.
+      simpl in H1.
+      rewrite <- H1 in H0.
+      pose proof H3 _ H0.
+      absurd (~ (a = a \/ False)).
+      {
+        auto.
+      }
+      assumption.
+    - enough (a1 = a /\ t1 = []) as Ht. {
+        destruct Ht.
+        subst.
+        reflexivity.
+      }
+      assert (a1 = a). {
+        pose proof H2 a1 (in_eq a1 t1) as Ht1.
+        destruct Ht1; auto.
+        contradiction.
+      }
+      split; auto.
+      subst.
+      (* NoDup a::t1, so t1 does not contain a *)
+      pose proof NoDup_cons_iff a t1 as [? _].
+      specialize (H7 H4).
+      destruct H7 as [? ?].
+      destruct t1 as [| a2 t1].
+      + reflexivity.
+      + exfalso.
+        pose proof H6 a2.
+        assert (In a2 (a :: a2 :: t1)). {
+          simpl.
+          right; left; auto.
+        }
+        specialize (H9 H10).
+        subst.
+        absurd (~ In a (a :: t1)). {
+          simpl.
+          auto.
+        }
+        assumption.
+  }
+  subst.
+  split.
+  - rewrite H1.
+    reflexivity.
+  - assert (NoDup ([a] ++ t2)) as Ht2. {
+      rewrite <- H1 in H.
+      assumption.
+    }
+    simpl in Ht2.
+    pose proof NoDup_cons_iff a t2 as [? _].
+    specialize (H6 Ht2).
+    tauto.
+Qed.
+
+(** Other lemmas *)
+
 Lemma In_in_concat_map {A B: Type}:
   forall (l: list A) (f: A -> list B) (b: B),
     (exists a, In a l /\ In b (f a)) ->
@@ -921,7 +1262,7 @@ Qed.
 
 (*********************************************************)
 (**                                                      *)
-(** Probability Distribution                             *)
+(** Properties of sum                                    *)
 (**                                                      *)
 (*********************************************************)
 
@@ -1116,6 +1457,12 @@ Proof.
   auto.
 Qed.
 
+(*********************************************************)
+(**                                                      *)
+(** Probability Distribution                             *)
+(**                                                      *)
+(*********************************************************)
+
 Module ProbDistr.
 
 Record Distr (A: Type): Type := {
@@ -1255,162 +1602,6 @@ Proof.
     reflexivity.
 Qed.
 
-Definition perm_filter_dup {A: Type} (l1 l2: list A): Prop :=
-  Permutation (filter_dup l1) (filter_dup l2).
-
-#[export] Instance eq_perm_filter_dup {A: Type}:
-  Equivalence (@perm_filter_dup A).
-Proof.
-  unfold perm_filter_dup.
-  apply equiv_in_domain.
-  split.
-  - unfold Reflexive.
-    reflexivity.
-  - unfold Symmetric.
-    symmetry; auto.
-  - unfold Transitive.
-    intros.
-    transitivity y.
-    all: auto.
-Qed.
-
-Lemma perm_filter_dup_perm {A: Type}:
-  forall (l1 l2: list A),
-    Permutation l1 l2 ->
-    perm_filter_dup l1 l2.
-Proof.
-  intros.
-  apply perm_filter_dup_incl.
-  intros.
-  split; eapply Permutation_in; [| symmetry]; auto.
-Qed.
-
-Lemma perm_filter_dup_app_sym {A: Type}:
-  forall (l1 l2: list A),
-    perm_filter_dup (l1 ++ l2) (l2 ++ l1).
-Proof.
-  intros.
-  enough (Permutation (l1 ++ l2) (l2 ++ l1)). {
-    apply perm_filter_dup_perm.
-    auto.
-  }
-  apply Permutation_app_comm.
-Qed.
-
-Lemma perm_filter_dup_app_comm {A: Type}:
-  forall (l1 l2 l3: list A),
-    perm_filter_dup (l1 ++ l2 ++ l3) ((l1 ++ l2) ++ l3).
-Proof.
-  intros.
-  enough (Permutation (l1 ++ l2 ++ l3) ((l1 ++ l2) ++ l3)). {
-    apply perm_filter_dup_perm.
-    auto.
-  }
-  rewrite app_assoc.
-  reflexivity.
-Qed.
-
-Lemma perm_filter_dup_app_perm_l:
-  forall {A: Type} (l1 l2 l0: list A),
-    Permutation l1 l2 ->
-    perm_filter_dup (l1 ++ l0) (l2 ++ l0).
-Proof.
-  intros.
-  enough (Permutation (l1 ++ l0) (l2 ++ l0)). {
-    apply perm_filter_dup_perm.
-    auto.
-  }
-  apply Permutation_app_tail.
-  auto.
-Qed.
-
-Lemma perm_filter_dup_app_perm_r:
-  forall {A: Type} (l1 l2 l0: list A),
-    Permutation l1 l2 ->
-    perm_filter_dup (l0 ++ l1) (l0 ++ l2).
-Proof.
-  intros.
-  transitivity (l1 ++ l0).
-  apply perm_filter_dup_app_sym.
-  transitivity (l2 ++ l0).
-  apply perm_filter_dup_app_perm_l; auto.
-  apply perm_filter_dup_app_sym.
-Qed.
-
-Lemma filter_dup_twice:
-  forall {A: Type} (l: list A),
-    Permutation (filter_dup (filter_dup l)) (filter_dup l).
-Proof.
-  intros.
-  apply perm_filter_dup_incl.
-  intros.
-  symmetry.
-  apply filter_dup_in_iff.
-Qed.
-
-Lemma perm_filter_dup_app_filter_dup_r:
-  forall {A: Type} (l1 l2: list A),
-    perm_filter_dup (l1 ++ l2) (l1 ++ filter_dup l2).
-Proof.
-  intros.
-  induction l1 as [| a l1 IH].
-  - simpl.
-    unfold perm_filter_dup.
-    symmetry.
-    apply filter_dup_twice.
-  - simpl.
-    unfold perm_filter_dup in *.
-    pose proof perm_filter_dup_incl_inv _ _ IH as IH0.
-    apply perm_filter_dup_incl.
-    intros.
-    split.
-    + intros.
-      simpl in H.
-      destruct H.
-      * subst.
-        left.
-        reflexivity.
-      * right.
-        apply IH0.
-        auto.
-    + intros.
-      simpl.
-      destruct H.
-      * subst.
-        left.
-        reflexivity.
-      * right.
-        apply IH0.
-        auto.
-Qed.
-
-(* 
-  Permutation (filter_dup (concat l1)) (filter_dup (concat l2))
-  holds if l1 and l2 satisfy the following condition:
-  Forall2 (fun lx ly => Permutation lx ly) l1 l2.
-*)
-Lemma Permutation_filter_dup_concat_congr {A: Type}:
-  forall (l1 l2: list (list A)),
-    Forall2 (fun a b => Permutation a b) l1 l2 ->
-    perm_filter_dup (concat l1) (concat l2).
-Proof.
-  intros.
-  induction H.
-  - simpl.
-    reflexivity.
-  - simpl.
-    transitivity (y ++ concat l).
-    apply perm_filter_dup_app_perm_l; auto.
-    transitivity (y ++ filter_dup (concat l)).
-    apply perm_filter_dup_app_filter_dup_r.
-    symmetry.
-    transitivity (y ++ filter_dup (concat l')).
-    apply perm_filter_dup_app_filter_dup_r.
-    apply perm_filter_dup_app_perm_r.
-    unfold perm_filter_dup in IHForall2.
-    symmetry.
-    apply IHForall2.
-Qed.
 
 Lemma sum_distr_congr_1 {A: Type}:
   forall (l1 l2: list (R * Distr A)) (d0: Distr A),
@@ -1493,36 +1684,6 @@ Proof.
   - apply sum_distr_congr_2; auto.
 Qed.
 
-Lemma perm_filter_dup_concat_perm:
-  forall {A: Type} (l1 l2: list (list A)),
-    Permutation l1 l2 ->
-    perm_filter_dup (concat l1) (concat l2).
-Proof.
-  intros.
-  induction H.
-  - simpl.
-    reflexivity.
-  - simpl.
-    transitivity (x ++ filter_dup (concat l)).
-    apply perm_filter_dup_app_filter_dup_r.
-    symmetry.
-    transitivity (x ++ filter_dup (concat l')).
-    apply perm_filter_dup_app_filter_dup_r.
-    apply perm_filter_dup_app_perm_r.
-    symmetry.
-    apply IHPermutation.
-  - simpl.
-    rewrite perm_filter_dup_app_comm.
-    rewrite perm_filter_dup_app_comm at 1.
-    transitivity ((y ++ x) ++ filter_dup (concat l)).
-    apply perm_filter_dup_app_filter_dup_r.
-    transitivity ((x ++ y) ++ filter_dup (concat l)).
-    2: symmetry; apply perm_filter_dup_app_filter_dup_r.
-    apply perm_filter_dup_app_perm_l.
-    apply Permutation_app_comm.
-  - transitivity (concat l').
-    all: auto.
-Qed.
 
 (* permutation of ds is ok with sum_distr *)
 (* export as congr instance *)
@@ -1574,143 +1735,6 @@ Proof.
       apply H.
     }
 Qed.
-
-
-Lemma incl_nodup_perm:
-  forall {A: Type} (l1 l2: list A),
-    NoDup l1 ->
-    NoDup l2 ->
-    incl l1 l2 ->
-    incl l2 l1 ->
-    Permutation l1 l2.
-Proof.
-  intros.
-  apply NoDup_Permutation; auto.
-  intros.
-  unfold incl in *.
-  split; intros.
-  - auto.
-  - auto.
-Qed.
-
-Lemma list_partition_in_notin:
-  forall {A: Type} (l t: list A),
-    exists t1 t2,
-      Permutation (t1 ++ t2) t /\
-      (forall a, In a t1 -> In a l) /\
-      (forall a, In a t2 -> ~ In a l).
-Proof.
-  intros.
-  exists (filter (fun a => if in_dec eq_dec a l then true else false) t),
-         (filter (fun a => if in_dec eq_dec a l then false else true) t).
-  split.
-  - induction t.
-    + simpl.
-      reflexivity.
-    + simpl.
-      destruct (in_dec eq_dec a l).
-      * simpl.
-        rewrite IHt.
-        reflexivity.
-      * simpl.
-        (* Search (Permutation (_ ++ _)). *)
-        rewrite Permutation_app_comm.
-        simpl.
-        apply Permutation_cons; [reflexivity | auto].
-        rewrite Permutation_app_comm.
-        apply IHt.
-  - split; intros.
-    + apply filter_In in H.
-      destruct H.
-      destruct (in_dec eq_dec a l).
-      * auto.
-      * inversion H0.
-    + apply filter_In in H.
-      destruct H.
-      destruct (in_dec eq_dec a l).
-      * inversion H0.
-      * auto.
-Qed.
-
-
-Lemma NoDup_partition_singleton:
-  forall {A: Type} (l: list A) (a: A),
-    NoDup l ->
-    In a l ->
-    exists l', 
-      Permutation l ([a] ++ l') /\
-      ~ In a l'.
-Proof.
-  intros.
-  pose proof list_partition_in_notin [a] l as [t1 [t2 [? [? ?]]]].
-  exists t2.
-  pose proof perm_nodup_app_l _ _ _ H1 H.
-  pose proof perm_nodup_app_r _ _ _ H1 H.
-  assert (t1 = [a]). {
-    simpl in *.
-    assert (forall a1, In a1 t1 -> a1 = a). {
-      intros; pose proof H2 a1 H6.
-      destruct H7; auto.
-      contradiction.
-    }
-    destruct t1 as [| a1 t1].
-    - (* if t1 is nil, then a must be in t2, which contradicts *) 
-      exfalso.
-      simpl in H1.
-      rewrite <- H1 in H0.
-      pose proof H3 _ H0.
-      absurd (~ (a = a \/ False)).
-      {
-        auto.
-      }
-      assumption.
-    - enough (a1 = a /\ t1 = []) as Ht. {
-        destruct Ht.
-        subst.
-        reflexivity.
-      }
-      assert (a1 = a). {
-        pose proof H2 a1 (in_eq a1 t1) as Ht1.
-        destruct Ht1; auto.
-        contradiction.
-      }
-      split; auto.
-      subst.
-      (* NoDup a::t1, so t1 does not contain a *)
-      pose proof NoDup_cons_iff a t1 as [? _].
-      specialize (H7 H4).
-      destruct H7 as [? ?].
-      destruct t1 as [| a2 t1].
-      + reflexivity.
-      + exfalso.
-        pose proof H6 a2.
-        assert (In a2 (a :: a2 :: t1)). {
-          simpl.
-          right; left; auto.
-        }
-        specialize (H9 H10).
-        subst.
-        absurd (~ In a (a :: t1)). {
-          simpl.
-          auto.
-        }
-        assumption.
-  }
-  subst.
-  split.
-  - rewrite H1.
-    reflexivity.
-  - assert (NoDup ([a] ++ t2)) as Ht2. {
-      rewrite <- H1 in H.
-      assumption.
-    }
-    simpl in Ht2.
-    pose proof NoDup_cons_iff a t2 as [? _].
-    specialize (H6 Ht2).
-    tauto.
-Qed.
-
-
 
 Lemma perm_map:
   forall (A B: Type) (f: A -> B) (l1 l2: list A),
@@ -5263,7 +5287,6 @@ Lemma In_combine_Forall2:
 Proof.
   intros.
   pose proof Forall2_to_forall _ _ _ H0.
-  Search Forall.
   rewrite Forall_forall in H1.
   specialize (H1 (a, b) H).
   simpl in *.
