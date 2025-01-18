@@ -1797,7 +1797,20 @@ Lemma list_pair_exists_combine:
       l = combine la lb /\
       length la = length lb.
 Proof.
-Admitted.
+  intros.
+  exists (map fst l), (map snd l).
+  split.
+  - induction l as [| [a b] l IH].
+    + simpl.
+      reflexivity.
+    + simpl.
+      f_equal; auto.
+  - induction l as [| [a b] l IH].
+    + simpl.
+      reflexivity.
+    + simpl.
+      f_equal; auto.
+Qed.
 
 Lemma In_combine_l_inv:
   forall {A B: Type} (l1: list A) (l2: list B) (a: A),
@@ -1805,7 +1818,27 @@ Lemma In_combine_l_inv:
     In a l1 ->
     exists b, In (a, b) (combine l1 l2).
 Proof.
-Admitted.
+  intros.
+  revert l2 H.
+  induction l1 as [| a1 l1 IH].
+  - inversion H0.
+  - intros.
+    destruct l2 as [| b l2].
+    + inversion H.
+    + simpl in H.
+      injection H as H.
+      destruct H0.
+      * subst.
+        exists b.
+        simpl.
+        auto.
+      * specialize (IH H0).
+        specialize (IH l2 H).
+        destruct IH as [b' Hin].
+        exists b'.
+        simpl.
+        auto.
+Qed.
 
 Lemma list_pair_partition_l:
   forall {A B: Type} (l1: list A) (l2: list B) (l1flag: list A),
