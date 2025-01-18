@@ -1615,6 +1615,36 @@ Notation "x '.(legal_prob_1)'" := (ProbDistr.legal_prob_1 _ x) (at level 1).
 
 (* Lemmas *)
 
+Lemma sum_distr_nil_prob_zero:
+  forall (ds : Distr Prop),
+    ProbDistr.sum_distr [] ds ->
+    ProbDistr.compute_pr ds 0.
+Proof.
+  intros.
+  destruct H as [H1 H2].
+  simpl in *.
+  assert (ds.(pset) = []). {
+    unfold empty_set in H1.
+    eapply Permutation_nil.
+    symmetry; auto.
+  }
+  unfold ProbDistr.compute_pr.
+  rewrite H.
+  exists [].
+  split; auto.
+  - intros.
+    split.
+    + intros.
+      inversion H0.
+    + intros.
+      destruct H0.
+      inversion H0.
+  - unfold sum_prob.
+    simpl.
+    split; auto.
+    constructor.
+Qed.
+
 Lemma not_in_pset_prob_0:
   forall {A: Type} (d: Distr A) (a: A),
     ProbDistr.legal d ->
