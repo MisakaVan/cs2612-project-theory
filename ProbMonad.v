@@ -4170,15 +4170,6 @@ Proof.
   lra.
 Admitted.
 
-(** Level 1 *)
-Theorem Always_bind_ret {A B: Type}:
-  forall (c2: A -> ProbMonad.M B)
-         (f: A -> B)
-         (P: B -> Prop),
-    (forall a, c2 a = ret (f a)) ->
-    (forall c1, Always c1 (fun a => P (f a)) <-> Always (a <- c1;; c2 a) P).
-Admitted.
-
 Theorem compute_pr_exists: forall f, exists r, ProbMonad.compute_pr f r.
 Proof.
   intros.
@@ -7235,3 +7226,228 @@ Proof.
   }
 Qed.
 
+Lemma bind_equiv_func_r_congr_1:
+  forall (A B: Type)
+         (f: ProbMonad.M A)
+         (g1 g2: A -> ProbMonad.M B),
+    (forall a, g1 a == g2 a) ->
+    forall d,
+    d ∈ (bind f g1).(distr) ->
+    d ∈ (bind f g2).(distr).
+Proof.
+  intros.
+  unfold bind in *.
+  simpl in *.
+  unfold ProbMonad.__bind in *.
+  destruct H0 as [da [lab [Hda [Hlab H_sum_lab_db]]]].
+  sets_unfold.
+  exists da, lab.
+  split; auto.
+  split; auto.
+  eapply Forall2_imply.
+  apply Hlab.
+  intros.
+  destruct b.
+  split.
+  - tauto.
+  - destruct H2.
+    assert (g1 a == g2 a) as H_g1_g2 by apply H.
+    unfold ProbMonad.equiv in H_g1_g2.
+    sets_unfold in H_g1_g2.
+    apply H_g1_g2.
+    assumption.
+Qed.
+
+Lemma bind_equiv_func_r_congr:
+  forall (A B: Type)
+         (f: ProbMonad.M A)
+         (g1 g2: A -> ProbMonad.M B),
+    (forall a, g1 a == g2 a) ->
+    bind f g1 == bind f g2.
+Proof.
+  intros.
+  unfold ProbMonad.equiv; sets_unfold.
+  intros d.
+  split.
+  - apply bind_equiv_func_r_congr_1; auto.
+  - apply bind_equiv_func_r_congr_1; auto.
+    symmetry; auto.
+Qed.
+
+
+
+(** Level 1 *)
+Theorem Always_bind_ret {A B: Type}:
+  forall (c2: A -> ProbMonad.M B)
+         (f: A -> B)
+         (P: B -> Prop),
+    (forall a, c2 a = ret (f a)) ->
+    (forall c1, Always c1 (fun a => P (f a)) <-> Always (a <- c1;; c2 a) P).
+Proof.
+  intros c2 f P Hc2 c1.
+  unfold Always.
+  unfold Hoare.
+  sets_unfold.
+  split.
+  {
+    intros H a.
+    specialize (H a).
+    unfold ProbMonad.compute_pr in *.
+    intros [d Hd].
+    sets_unfold in Hd.
+    destruct Hd as [Hd1 Hd2].
+    apply H; clear H.
+    exists d.
+    split; auto.
+    clear Hd2.
+    sets_unfold.
+    assert (c2 = fun a => ret (f a)) as Hc2'. {
+      apply functional_extensionality.
+      intros.
+      apply Hc2.
+    }
+    subst c2; clear Hc2.
+    remember (ProbMonad.bind (ProbMonad.bind c1 (fun a : A => ProbMonad.ret (f a))) (fun res : B => ProbMonad.ret (P res))) as bind1.
+    remember (ProbMonad.bind c1 (fun res: A => ProbMonad.ret (P (f res)))) as bind2.
+    assert (d ∈ bind1.(distr)) as Hdin1.
+    {
+      subst bind1.
+      subst bind2.
+      sets_unfold.
+      unfold bind, ret in *; simpl in *.
+      unfold ProbMonad.__bind, ProbMonad.__ret in *; simpl in *.
+      exact Hd1.
+    }
+    clear Hd1.
+    enough (d ∈ bind2.(distr)) as Hdin2.
+    {
+      subst bind2.
+      sets_unfold.
+      unfold bind, ret in *; simpl in *.
+      unfold ProbMonad.__bind, ProbMonad.__ret in *; simpl in *.
+      exact Hdin2.
+    }
+    remember (ProbMonad.bind c1 (fun a: A => ProbMonad.bind (ProbMonad.ret (f a)) (fun res: B => ProbMonad.ret (P res))))
+     as bind1'.
+    assert (bind1 == bind1') as Hbind1eqbind1'.
+    {
+      subst bind1'.
+      subst bind1.
+      eapply bind_assoc.
+    }
+    assert (d ∈ bind1'.(distr)) as Hdin1'.
+    {
+      unfold ProbMonad.equiv in Hbind1eqbind1'.
+      rewrite <- Hbind1eqbind1'.
+      exact Hdin1.
+    }
+    clear bind1 Heqbind1 Hdin1 Hbind1eqbind1'.
+    remember (fun res : A => ProbMonad.ret (P (f res))) as func2.
+    remember (fun a : A =>
+    ProbMonad.bind (ProbMonad.ret (f a))
+      (fun res : B => ProbMonad.ret (P res))) as func1'.
+    assert (forall a, func1' a == func2 a) as Hfunc1eqfunc2.
+    {
+      clear a.
+      intros.
+      subst.
+      remember (ProbMonad.bind (ProbMonad.ret (f a))
+      (fun res : B => ProbMonad.ret (P res))) as lhs.
+      pose proof bind_ret_l _ _ (f a) (fun res : B => ProbMonad.ret (P res)).
+      unfold bind, ret in H; simpl in H.
+      rewrite <- Heqlhs in H.
+      assumption.
+    }
+    assert (bind1' == bind2). {
+      subst.
+      eapply bind_equiv_func_r_congr.
+      apply Hfunc1eqfunc2.
+    }
+    sets_unfold.
+    unfold ProbMonad.equiv in H.
+    sets_unfold in H.
+    rewrite <- H.
+    exact Hdin1'.
+  }
+  {
+    intros H a.
+    specialize (H a).
+    unfold ProbMonad.compute_pr in *.
+    intros [d Hd].
+    sets_unfold in Hd.
+    destruct Hd as [Hd1 Hd2].
+    apply H; clear H.
+    exists d.
+    split; auto.
+    clear Hd2.
+    sets_unfold.
+    assert (c2 = fun a => ret (f a)) as Hc2'. {
+      apply functional_extensionality.
+      intros.
+      apply Hc2.
+    }
+    subst c2; clear Hc2.
+    remember (ProbMonad.bind (ProbMonad.bind c1 (fun a : A => ProbMonad.ret (f a))) (fun res : B => ProbMonad.ret (P res))) as bind1.
+    remember (ProbMonad.bind c1 (fun res: A => ProbMonad.ret (P (f res)))) as bind2.
+    assert (d ∈ bind2.(distr)) as Hdin1.
+    {
+      subst bind1.
+      subst bind2.
+      sets_unfold.
+      unfold bind, ret in *; simpl in *.
+      unfold ProbMonad.__bind, ProbMonad.__ret in *; simpl in *.
+      exact Hd1.
+    }
+    clear Hd1.
+    enough (d ∈ bind1.(distr)) as Hdin2.
+    {
+      subst.
+      sets_unfold.
+      unfold bind, ret in *; simpl in *.
+      unfold ProbMonad.__bind, ProbMonad.__ret in *; simpl in *.
+      exact Hdin2.
+    }
+    remember (ProbMonad.bind c1 (fun a: A => ProbMonad.bind (ProbMonad.ret (f a)) (fun res: B => ProbMonad.ret (P res))))
+     as bind1'.
+    assert (bind1 == bind1') as Hbind1eqbind1'.
+    {
+      subst bind1'.
+      subst bind1.
+      eapply bind_assoc.
+    }
+    enough (d ∈ bind1'.(distr)) as Hdin1'.
+    {
+      unfold ProbMonad.equiv in Hbind1eqbind1'.
+      sets_unfold in Hbind1eqbind1'.
+      apply Hbind1eqbind1'.
+      exact Hdin1'.
+    }
+    clear bind1 Heqbind1 Hbind1eqbind1'.
+    remember (fun res : A => ProbMonad.ret (P (f res))) as func2.
+    remember (fun a : A =>
+    ProbMonad.bind (ProbMonad.ret (f a))
+      (fun res : B => ProbMonad.ret (P res))) as func1'.
+    assert (forall a, func1' a == func2 a) as Hfunc1eqfunc2.
+    {
+      clear a.
+      intros.
+      subst.
+      remember (ProbMonad.bind (ProbMonad.ret (f a))
+      (fun res : B => ProbMonad.ret (P res))) as lhs.
+      pose proof bind_ret_l _ _ (f a) (fun res : B => ProbMonad.ret (P res)).
+      unfold bind, ret in H; simpl in H.
+      rewrite <- Heqlhs in H.
+      assumption.
+    }
+    assert (bind1' == bind2). {
+      subst.
+      eapply bind_equiv_func_r_congr.
+      apply Hfunc1eqfunc2.
+    }
+    sets_unfold.
+    unfold ProbMonad.equiv in H.
+    sets_unfold in H.
+    apply H.
+    exact Hdin1.
+  }
+Qed.
