@@ -1642,15 +1642,7 @@ Proof.
     lia.
 Qed.
 
-Lemma combine_app_eq:
-  forall {A B: Type} {la: list A} {lb: list B} {la1 lb1 la2 lb2},
-    length la = length lb ->
-    length la1 = length lb1 ->
-    length la2 = length lb2 ->
-    combine la lb = (combine la1 lb1) ++ (combine la2 lb2) <->
-    la = la1 ++ la2 /\ lb = lb1 ++ lb2.
-Proof.
-Admitted.
+
 
 Lemma Forall2_perm_combine:
   forall {A B: Type} l1 l1' l2 l2' (f: A -> B -> Prop),
