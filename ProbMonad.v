@@ -1308,6 +1308,23 @@ Proof.
 Admitted.
       
 
+#[export] Instance incl_perm_congr {A: Type}:
+  Proper (Permutation (A:=A) ==> Permutation (A:=A) ==> iff) (incl (A:=A)).
+Proof.
+  unfold Proper, respectful.
+  intros.
+  unfold incl.
+  split; intros.
+  - rewrite <- H in H2.
+    pose proof H1 _ H2.
+    rewrite <- H0.
+    auto.
+  - rewrite H in H2.
+    pose proof H1 _ H2.
+    rewrite H0.
+    auto.
+Qed.
+
 Lemma Permutation_filter_dup_concat_incl:
   forall {A: Type} (l1: list A) (l2: list (list A)),
     Permutation l1 (filter_dup (concat l2)) ->
@@ -1315,7 +1332,12 @@ Lemma Permutation_filter_dup_concat_incl:
       forall l, In l l2 -> incl l l1
     ).
 Proof.
-Admitted.
+  intros.
+  apply in_listlist_concat_incl in H0.
+  rewrite H.
+  apply filter_dup_incl_list.
+  auto.
+Qed.
 
 Lemma Forall2_app_l_break_r:
   forall {A B: Type} (l1a l1b: list A) (l2: list B) (f: A -> B -> Prop),
