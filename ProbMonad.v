@@ -1744,7 +1744,7 @@ Proof.
       pose proof F2_sl H.
       eapply (Forall2_perm_combine l1 l1' l2 l2'); auto.
       lia.
-Admitted.
+Qed.
 
 Lemma Forall2_perm_l_exists:
   forall {A B: Type} (l1: list A) (l2: list B) (f: A -> B -> Prop) (l1': list A),
