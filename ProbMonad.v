@@ -1846,6 +1846,7 @@ Proof.
   }
 Qed.
 
+(* Level 1 *)
 Theorem ProbDistr_compute_pr_exists: forall d, exists r,
   ProbDistr.compute_pr d r.
 Proof.
@@ -1933,8 +1934,8 @@ Proof.
         rewrite H0.
         auto.
 Qed. 
-  
-(** Level 1 *)
+
+
 Definition valid_prop_sublist(l t: list Prop): Prop :=
   forall P, In P t <-> In P l /\ P.
 
@@ -2012,6 +2013,7 @@ Proof.
     reflexivity.
 Qed.
 
+(** Level 1 *)
 #[export] Instance ProbDistr_imply_event_refl:
   Reflexive ProbDistr.imply_event.
 Proof.
@@ -2023,9 +2025,10 @@ Proof.
   apply Rle_refl.
 Qed.
 
+(** Level 1 *)
 Theorem ProbDistr_imply_event_refl_setoid:
   forall d1 d2, ProbDistr.equiv_event d1 d2 -> ProbDistr.imply_event d1 d2.
-Proof. (** Level 1 *)
+Proof.
   intros.
   unfold ProbDistr.equiv_event, ProbDistr.imply_event in *.
   destruct H as [r1 [r2 [? [? ?]]]].
@@ -2035,9 +2038,10 @@ Proof. (** Level 1 *)
   apply Rle_refl.
 Qed.
 
+(** Level 1 *)
 #[export] Instance ProbDistr_equiv_equiv {A: Type}:
   Equivalence (@ProbDistr.equiv A).
-Proof. (** Level 1 *)
+Proof. 
   unfold ProbDistr.equiv.
   split.
   - unfold Reflexive.
@@ -2060,8 +2064,7 @@ Proof. (** Level 1 *)
     (* + Search (Permutation _ _ -> Permutation _ _ -> Permutation _ _).  *)
 Qed.
 
-
-
+(** Level 1 *)
 #[export] Instance ProbDistr_imply_event_trans:
   Transitive ProbDistr.imply_event.
 Proof.
@@ -2088,6 +2091,7 @@ Proof.
     auto.    
 Qed.
 
+(** Level 1 *)
 #[export] Instance ProbDistr_equiv_event_equiv:
   Equivalence ProbDistr.equiv_event.
 Proof.
@@ -2117,6 +2121,7 @@ Proof.
     apply compute_pr_same with (d := y); auto.
 Qed.
 
+(** Level 1 *)
 #[export] Instance ProbDistr_imply_event_congr:
   Proper (ProbDistr.equiv_event ==>
           ProbDistr.equiv_event ==> iff) ProbDistr.imply_event.
@@ -2154,6 +2159,7 @@ Proof.
       auto.
 Qed.  
 
+(** Level 1 *)
 #[export] Instance ProbDistr_compute_pr_congr:
   Proper (ProbDistr.equiv_event ==> Sets.equiv) ProbDistr.compute_pr.
 Proof.
@@ -2172,6 +2178,7 @@ Proof.
     auto.
 Qed.
 
+(** Level 1 *)
 Theorem ProbDistr_compute_pr_mono:
   forall f1 f2 r1 r2,
     ProbDistr.compute_pr f1 r1 ->
@@ -3934,6 +3941,7 @@ Proof.
       * admit.
 Admitted. 
 
+(** Level 1 *)
 Theorem Always_conseq: forall {A: Type} (P Q: A -> Prop),
   (forall a, P a -> Q a) ->
   (forall c, Always c P -> Always c Q).
@@ -4138,13 +4146,14 @@ Proof.
   lra.
 Admitted.
 
+(** Level 1 *)
 Theorem Always_bind_ret {A B: Type}:
   forall (c2: A -> ProbMonad.M B)
          (f: A -> B)
          (P: B -> Prop),
     (forall a, c2 a = ret (f a)) ->
     (forall c1, Always c1 (fun a => P (f a)) <-> Always (a <- c1;; c2 a) P).
-Admitted. (** Level 1 *)
+Admitted.
 
 Theorem compute_pr_exists: forall f, exists r, ProbMonad.compute_pr f r.
 Proof.
@@ -4156,9 +4165,10 @@ Proof.
   tauto.
 Qed.
 
+(** Level 2 *)
 #[export] Instance ProbMonad_imply_event_refl:
   Reflexive ProbMonad.imply_event.
-Proof. (** Level 2 *)
+Proof.
   unfold Reflexive.
   unfold ProbMonad.imply_event.
   intros.
@@ -4171,9 +4181,10 @@ Proof. (** Level 2 *)
   apply ProbDistr_imply_event_refl.
 Qed.
   
+(** Level 2 *)
 Theorem ProbMonad_imply_event_refl_setoid:
   forall d1 d2, ProbMonad.equiv_event d1 d2 -> ProbMonad.imply_event d1 d2.
-Proof. (** Level 2 *)
+Proof.
   intros.
   unfold ProbMonad.equiv_event, ProbMonad.imply_event in *.
   destruct H as [r1 [r2 [? [? ?]]]].
@@ -4245,10 +4256,11 @@ Proof.
   apply Permutation_map'.
   assumption.
 Qed.
-  
+
+(** Level 2 *)
 #[export] Instance ProbMonad_imply_event_trans:
   Transitive ProbMonad.imply_event.
-Proof. (** Level 2 *)
+Proof.
   unfold Transitive, ProbMonad.imply_event.
   intros x y z.
   intros [dx [dy [Hx [Hy H_imp_xy]]]] [dy' [dz [Hy' [Hz H_imp_yz]]]].
@@ -4266,10 +4278,10 @@ Proof. (** Level 2 *)
   assumption.
 Qed.
   
-
+(** Level 2 *)
 #[export] Instance ProbMonad_equiv_event_equiv:
   Equivalence ProbMonad.equiv_event.
-Proof. (** Level 2 *)
+Proof.
   unfold ProbMonad.equiv_event.
   split.
   - unfold Reflexive.
@@ -4303,10 +4315,11 @@ Proof. (** Level 2 *)
     transitivity d2'; auto.
 Qed.
 
+(** Level 2 *)
 #[export] Instance ProbMonad_imply_event_congr:
   Proper (ProbMonad.equiv_event ==>
           ProbMonad.equiv_event ==> iff) ProbMonad.imply_event.
-Proof. (** Level 2 *)
+Proof.
   unfold Proper, respectful.
   intros x y H x0 y0 H0.
   split; intros.
@@ -4322,9 +4335,10 @@ Proof. (** Level 2 *)
     transitivity y0; auto.
 Qed.  
 
+(** Level 2 *)
 #[export] Instance compute_pr_congr:
   Proper (ProbMonad.equiv_event ==> Sets.equiv) ProbMonad.compute_pr.
-Proof. (** Level 2 *)
+Proof.
   unfold Proper, respectful.
   intros x y H.
   destruct H as [d1 [d2 [H1 [H2 Heq]]]].
@@ -4393,12 +4407,13 @@ Proof.
   assumption.
 Qed.
 
+(** Level 2 *)
 #[export] Instance ProbMonad_bind_congr (A B: Type):
   Proper (ProbMonad.equiv ==>
           pointwise_relation _ ProbMonad.equiv ==>
           ProbMonad.equiv)
     (@bind _ ProbMonad A B).
-Proof. (** Level 2 *)    
+Proof.  
   unfold Proper, pointwise_relation, respectful.
   unfold ProbMonad.equiv in *.
   sets_unfold.
@@ -4687,6 +4702,7 @@ Lemma bind_congruence_step:
 Proof.
 Admitted.
 
+(** Level 2 *)
 #[export] Instance ProbMonad_bind_mono_event (A: Type):
 Proper
   (ProbMonad.equiv ==>
@@ -4832,12 +4848,13 @@ Proof.
   repeat split; auto.
 Qed.
 
+(** Level 2 *)
 #[export] Instance ProbMonad_bind_congr_event (A: Type):
   Proper (ProbMonad.equiv ==>
           pointwise_relation _ ProbMonad.equiv_event ==>
           ProbMonad.equiv_event)
     (@bind _ ProbMonad A Prop).
-Proof. (** Level 2 *)
+Proof.
   unfold Proper, pointwise_relation, respectful.
   unfold ProbMonad.equiv, ProbMonad.equiv_event in *.
   sets_unfold.
@@ -5001,9 +5018,10 @@ Proof.
       reflexivity.
 Qed.
 
+(** Level 2 *)
 #[export] Instance ProbMonad_ret_mono_event:
   Proper (Basics.impl ==> ProbMonad.imply_event) ret.
-Proof. (** Level 2 *)
+Proof.
   unfold Proper, Basics.impl, ProbMonad.imply_event.
   intros P Q H.
   simpl.
@@ -5189,9 +5207,10 @@ Proof.
   assumption.
 Qed.
 
+(** Level 2 *)
 #[export] Instance ProbMonad_ret_congr_event:
   Proper (iff ==> ProbMonad.equiv_event) ret.
-Proof. (** Level 2 *)
+Proof.
   unfold Proper, respectful.
   intros P Q H.
   destruct H as [Hpq Hqp].
@@ -5436,7 +5455,7 @@ Qed.
 
       
 
-
+(** Level 3 *)
 Lemma bind_assoc:
   forall (A B C: Type)
          (f: ProbMonad.M A)
@@ -6740,8 +6759,9 @@ Proof.
       reflexivity.
     }
   }
-Qed. (** Level 3 *)
+Qed.
 
+(** Level 3 *)
 Lemma bind_assoc_event:
   forall (A B: Type)
          (f: ProbMonad.M A)
@@ -6811,6 +6831,7 @@ Proof.
     lra.
 Qed.
 
+(** Level 3 *)
 Lemma bind_ret_l:
   forall (A B: Type)
          (a: A)
@@ -6892,6 +6913,7 @@ Proof.
   }
 Qed.
 
+(** Level 3 *)
 Lemma bind_ret_l_event:
   forall (A: Type)
          (a: A)
@@ -6970,6 +6992,7 @@ Proof.
     reflexivity.
 Qed.
 
+(** Level 3 *)
 Lemma bind_ret_r:
   forall (A: Type)
          (f: ProbMonad.M A),
