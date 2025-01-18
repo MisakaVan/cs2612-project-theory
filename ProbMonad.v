@@ -73,13 +73,6 @@ Proof.
       right; auto.
 Qed.
 
-Lemma Forall2_perm_l_exists:
-  forall {A B: Type} (l1: list A) (l2: list B) (f: A -> B -> Prop) (l1': list A),
-    Permutation l1 l1' ->
-    Forall2 f l1 l2 ->
-    exists l2', Permutation l2 l2' /\ Forall2 f l1' l2'.
-Proof.
-Admitted.
 
 Lemma Forall2_perm_r_exists:
   forall {A B: Type} (l1: list A) (l2: list B) (f: A -> B -> Prop) (l2': list B),
@@ -244,6 +237,7 @@ Qed.
 (**                                                      *)
 (*********************************************************)
 
+(** filter_dup  *)
 
 (* use ListSet to define *)
 
@@ -321,22 +315,6 @@ Proof.
           apply IH.
           auto.
         }
-Qed.
-
-Lemma Permutation_filter_dup_filter_dup_incl_inv:
-  forall {A: Type} (l1 l2: list A),
-    (forall x, In x l1 <-> In x l2) ->
-    Permutation (filter_dup l1) (filter_dup l2).
-Proof.
-  intros.
-  apply NoDup_Permutation.
-  - apply filter_dup_nodup.
-  - apply filter_dup_nodup.
-  - intros.
-    specialize (filter_dup_incl l1 x).
-    specialize (filter_dup_incl l2 x).
-    specialize (H x).
-    tauto.
 Qed.
 
 Lemma filter_dup_in {A: Type}:
@@ -455,6 +433,98 @@ Proof.
       reflexivity.
 Qed.
 
+Lemma filter_dup_cons:
+  forall {A: Type} (l: list A) (a: A),
+    filter_dup (a :: l) = set_add eq_dec a (filter_dup l).
+Proof.
+  intros.
+  unfold filter_dup.
+  simpl.
+  reflexivity.
+Qed.
+
+Lemma set_add_already_in:
+  forall {A: Type} (l: list A) (a: A),
+    In a l -> set_add eq_dec a l = l.
+Proof.
+  intros.
+  induction l.
+  - contradiction.
+  - simpl.
+    destruct (eq_dec a a0).
+    + subst.
+      reflexivity.
+    + simpl in H.
+      destruct H.
+      * subst; contradiction.
+      * f_equal.
+        apply IHl.
+        auto.
+Qed.
+
+Lemma set_add_not_in:
+  forall {A: Type} (l: list A) (a: A),
+    ~ In a l -> set_add eq_dec a l = l ++ [a].
+Proof.
+  intros.
+  induction l.
+  - simpl.
+    reflexivity.
+  - simpl.
+    destruct (eq_dec a a0).
+    + subst.
+      assert (In a0 (a0 :: l)) by apply in_eq.
+      contradiction.
+    + simpl.
+      f_equal.
+      apply IHl.
+      unfold not.
+      intros.
+      apply H.
+      right.
+      auto.
+Qed.
+
+Lemma perm_filter_dup_notin:
+  forall {A: Type} (l: list A) (a: A),
+    ~ In a (filter_dup l) ->
+    Permutation (filter_dup (a :: l)) (a :: filter_dup l).
+Proof.
+  intros.
+  rewrite filter_dup_cons.
+  rewrite set_add_not_in; auto.
+  rewrite Permutation_app_comm.
+  simpl; auto.
+Qed.
+
+Lemma perm_filter_dup_in:
+  forall {A: Type} (l: list A) (a: A),
+    In a (filter_dup l) ->
+    Permutation (filter_dup (a :: l)) (filter_dup l).
+Proof.
+  intros.
+  rewrite filter_dup_cons.
+  rewrite set_add_already_in; auto.
+Qed.
+
+(** filter_dup and Permutation  *)
+
+Lemma Permutation_filter_dup_filter_dup_incl_inv:
+  forall {A: Type} (l1 l2: list A),
+    (forall x, In x l1 <-> In x l2) ->
+    Permutation (filter_dup l1) (filter_dup l2).
+Proof.
+  intros.
+  apply NoDup_Permutation.
+  - apply filter_dup_nodup.
+  - apply filter_dup_nodup.
+  - intros.
+    specialize (filter_dup_incl l1 x).
+    specialize (filter_dup_incl l2 x).
+    specialize (H x).
+    tauto.
+Qed.
+
 Lemma perm_filter_dup_cons {A: Type}:
   forall (l l1 l2: list A),
     Permutation (filter_dup l1) (filter_dup l2) ->
@@ -501,6 +571,23 @@ Proof.
     tauto.
 Qed.
 
+Lemma perm_filter_dup_incl_inv{A: Type}:
+  forall (l1 l2: list A),
+    Permutation (filter_dup l1) (filter_dup l2) ->
+    (forall x, In x l1 <-> In x l2).
+Proof.
+  intros.
+  split; intros.
+  - apply filter_dup_in.
+    rewrite <- H.
+    apply filter_dup_in_inv.
+    auto.
+  - apply filter_dup_in.
+    rewrite H.
+    apply filter_dup_in_inv.
+    auto.
+Qed.
+
 Lemma nodup_perm_filter_dup {A: Type}:
   forall (l: list A),
     NoDup l ->
@@ -535,6 +622,197 @@ Proof.
   pose proof Permutation_NoDup' H.
   tauto.
 Qed.
+
+Definition perm_filter_dup {A: Type} (l1 l2: list A): Prop :=
+  Permutation (filter_dup l1) (filter_dup l2).
+
+#[export] Instance eq_perm_filter_dup {A: Type}:
+  Equivalence (@perm_filter_dup A).
+Proof.
+  unfold perm_filter_dup.
+  apply equiv_in_domain.
+  split.
+  - unfold Reflexive.
+    reflexivity.
+  - unfold Symmetric.
+    symmetry; auto.
+  - unfold Transitive.
+    intros.
+    transitivity y.
+    all: auto.
+Qed.
+
+Lemma perm_filter_dup_perm {A: Type}:
+  forall (l1 l2: list A),
+    Permutation l1 l2 ->
+    perm_filter_dup l1 l2.
+Proof.
+  intros.
+  apply perm_filter_dup_incl.
+  intros.
+  split; eapply Permutation_in; [| symmetry]; auto.
+Qed.
+
+Lemma perm_filter_dup_app_sym {A: Type}:
+  forall (l1 l2: list A),
+    perm_filter_dup (l1 ++ l2) (l2 ++ l1).
+Proof.
+  intros.
+  enough (Permutation (l1 ++ l2) (l2 ++ l1)). {
+    apply perm_filter_dup_perm.
+    auto.
+  }
+  apply Permutation_app_comm.
+Qed.
+
+Lemma perm_filter_dup_app_comm {A: Type}:
+  forall (l1 l2 l3: list A),
+    perm_filter_dup (l1 ++ l2 ++ l3) ((l1 ++ l2) ++ l3).
+Proof.
+  intros.
+  enough (Permutation (l1 ++ l2 ++ l3) ((l1 ++ l2) ++ l3)). {
+    apply perm_filter_dup_perm.
+    auto.
+  }
+  rewrite app_assoc.
+  reflexivity.
+Qed.
+
+Lemma perm_filter_dup_app_perm_l:
+  forall {A: Type} (l1 l2 l0: list A),
+    Permutation l1 l2 ->
+    perm_filter_dup (l1 ++ l0) (l2 ++ l0).
+Proof.
+  intros.
+  enough (Permutation (l1 ++ l0) (l2 ++ l0)). {
+    apply perm_filter_dup_perm.
+    auto.
+  }
+  apply Permutation_app_tail.
+  auto.
+Qed.
+
+Lemma perm_filter_dup_app_perm_r:
+  forall {A: Type} (l1 l2 l0: list A),
+    Permutation l1 l2 ->
+    perm_filter_dup (l0 ++ l1) (l0 ++ l2).
+Proof.
+  intros.
+  transitivity (l1 ++ l0).
+  apply perm_filter_dup_app_sym.
+  transitivity (l2 ++ l0).
+  apply perm_filter_dup_app_perm_l; auto.
+  apply perm_filter_dup_app_sym.
+Qed.
+
+Lemma filter_dup_twice:
+  forall {A: Type} (l: list A),
+    Permutation (filter_dup (filter_dup l)) (filter_dup l).
+Proof.
+  intros.
+  apply perm_filter_dup_incl.
+  intros.
+  symmetry.
+  apply filter_dup_in_iff.
+Qed.
+
+Lemma perm_filter_dup_app_filter_dup_r:
+  forall {A: Type} (l1 l2: list A),
+    perm_filter_dup (l1 ++ l2) (l1 ++ filter_dup l2).
+Proof.
+  intros.
+  induction l1 as [| a l1 IH].
+  - simpl.
+    unfold perm_filter_dup.
+    symmetry.
+    apply filter_dup_twice.
+  - simpl.
+    unfold perm_filter_dup in *.
+    pose proof perm_filter_dup_incl_inv _ _ IH as IH0.
+    apply perm_filter_dup_incl.
+    intros.
+    split.
+    + intros.
+      simpl in H.
+      destruct H.
+      * subst.
+        left.
+        reflexivity.
+      * right.
+        apply IH0.
+        auto.
+    + intros.
+      simpl.
+      destruct H.
+      * subst.
+        left.
+        reflexivity.
+      * right.
+        apply IH0.
+        auto.
+Qed.
+
+(* 
+  Permutation (filter_dup (concat l1)) (filter_dup (concat l2))
+  holds if l1 and l2 satisfy the following condition:
+  Forall2 (fun lx ly => Permutation lx ly) l1 l2.
+*)
+Lemma Permutation_filter_dup_concat_congr {A: Type}:
+  forall (l1 l2: list (list A)),
+    Forall2 (fun a b => Permutation a b) l1 l2 ->
+    perm_filter_dup (concat l1) (concat l2).
+Proof.
+  intros.
+  induction H.
+  - simpl.
+    reflexivity.
+  - simpl.
+    transitivity (y ++ concat l).
+    apply perm_filter_dup_app_perm_l; auto.
+    transitivity (y ++ filter_dup (concat l)).
+    apply perm_filter_dup_app_filter_dup_r.
+    symmetry.
+    transitivity (y ++ filter_dup (concat l')).
+    apply perm_filter_dup_app_filter_dup_r.
+    apply perm_filter_dup_app_perm_r.
+    unfold perm_filter_dup in IHForall2.
+    symmetry.
+    apply IHForall2.
+Qed.
+
+Lemma perm_filter_dup_concat_perm:
+  forall {A: Type} (l1 l2: list (list A)),
+    Permutation l1 l2 ->
+    perm_filter_dup (concat l1) (concat l2).
+Proof.
+  intros.
+  induction H.
+  - simpl.
+    reflexivity.
+  - simpl.
+    transitivity (x ++ filter_dup (concat l)).
+    apply perm_filter_dup_app_filter_dup_r.
+    symmetry.
+    transitivity (x ++ filter_dup (concat l')).
+    apply perm_filter_dup_app_filter_dup_r.
+    apply perm_filter_dup_app_perm_r.
+    symmetry.
+    apply IHPermutation.
+  - simpl.
+    rewrite perm_filter_dup_app_comm.
+    rewrite perm_filter_dup_app_comm at 1.
+    transitivity ((y ++ x) ++ filter_dup (concat l)).
+    apply perm_filter_dup_app_filter_dup_r.
+    transitivity ((x ++ y) ++ filter_dup (concat l)).
+    2: symmetry; apply perm_filter_dup_app_filter_dup_r.
+    apply perm_filter_dup_app_perm_l.
+    apply Permutation_app_comm.
+  - transitivity (concat l').
+    all: auto.
+Qed.
+
+
+(** NoDup  *)
 
 Lemma nodup_app_l {A: Type}:
   forall (l1 l2: list A),
@@ -597,6 +875,24 @@ Proof.
   tauto.
 Qed.
 
+
+Lemma incl_nodup_perm:
+  forall {A: Type} (l1 l2: list A),
+    NoDup l1 ->
+    NoDup l2 ->
+    incl l1 l2 ->
+    incl l2 l1 ->
+    Permutation l1 l2.
+Proof.
+  intros.
+  apply NoDup_Permutation; auto.
+  intros.
+  unfold incl in *.
+  split; intros.
+  - auto.
+  - auto.
+Qed.
+
 Lemma in_listlist_concat_incl {A: Type}:
   forall (l: list A) (ll: list (list A)),
     In l ll ->
@@ -609,6 +905,10 @@ Proof.
   exists l.
   split; auto.
 Qed.
+
+
+
+(** Permutation and map *)
 
 Definition perm_after_map {A B: Type} (f: A -> B) (l1 l2: list A): Prop :=
   Permutation (map f l1) (map f l2).
@@ -657,6 +957,23 @@ Proof.
   - apply perm_after_map_perm with (l1 := x) (l3 := x0); auto.
   - apply perm_after_map_perm with (l1 := y) (l3 := y0); auto.
     all: symmetry; auto.
+Qed.
+
+
+
+(** Forall2 *)
+
+Lemma Forall2_inv:
+  forall {A B: Type}
+         {pred: A -> B -> Prop}
+         {la: list A} {lb: list B}
+         {a: A} {b: B},
+    Forall2 pred (a :: la) (b :: lb) ->
+    pred a b /\ Forall2 pred la lb.
+Proof.
+  intros.
+  inversion H.
+  split; auto.
 Qed.
 
 Lemma Forall2_same_length {A B: Type}:
@@ -862,403 +1179,448 @@ Proof.
   auto.
 Qed.
 
-Lemma In_in_concat_map {A B: Type}:
-  forall (l: list A) (f: A -> list B) (b: B),
-    (exists a, In a l /\ In b (f a)) ->
-    In b (concat (map f l)).
+Lemma Forall2_to_forall:
+  forall {A B: Type} (l1: list A) (l2: list B) (f: A -> B -> Prop),
+    Forall2 f l1 l2 ->
+    Forall (fun '(a, b) => f a b) (combine l1 l2).
 Proof.
   intros.
-  destruct H as [a [? ?]].
-  apply in_concat.
-  exists (f a).
-  split; auto.
-  apply in_map_iff.
-  exists a.
+  induction H.
+  - constructor.
+  - simpl.
+    constructor; auto.
+Qed.
+
+Lemma in_exists_remaining_list_perm:
+  forall {A: Type} (l: list A) (a: A) ,
+    In a l -> exists l', Permutation l (a :: l').
+Proof.
+  induction l.
+  - contradiction.
+  - intros.
+    destruct H.
+    + subst.
+      exists l.
+      apply Permutation_refl.
+    + specialize (IHl a0 H).
+      destruct IHl as [l' H_perm].
+      exists (a :: l').
+      (* Search Permutation. *)
+      pose proof perm_swap a a0 l' as H_swap.
+      pose proof Permutation_trans.
+      specialize (H0 A (a :: l) (a :: a0 :: l') (a0 :: a :: l')).
+      apply H0.
+      * apply Permutation_cons; auto.
+      * apply Permutation_sym.
+        apply H_swap.
+Qed.
+
+Lemma in_map_eq:
+  forall {A B: Type} (f: A -> B) (g: A -> B) (l: list A),
+    (forall a, In a l -> f a = g a) -> 
+    map f l = map g l.
+Proof.
+  intros.
+  induction l.
+  - reflexivity.
+  - simpl.
+    f_equal.
+    + apply H.
+      simpl; auto.
+    + apply IHl.
+      intros.
+      apply H.
+      simpl; auto.
+Qed.
+
+Lemma not_in_filter_dup_remove:
+  forall {A: Type} (l1 l2: list A) (a: A),
+    ~ In a (filter_dup (l1 ++ l2)) -> ~ In a (filter_dup l2).
+Proof.
+  intros.
+  unfold not.
+  intros.
+  apply H.
+  clear H.
+  pose proof filter_dup_in _ _ H0.
+  apply filter_dup_in_inv.
+  apply in_or_app.
+  right.
   auto.
 Qed.
 
-Lemma in_in_app_app:
-  forall {A: Type} (a: A) (l1 l2 l0: list A),
-    (
-      In a l1 -> In a l2
-    ) ->
-    (
-      In a (l0 ++ l1) -> In a (l0 ++ l2)
-    ).
+
+Lemma Forall2_imply:
+  forall {A B: Type} (l1: list A) (l2: list B) (P Q: A -> B -> Prop) ,
+    Forall2 P l1 l2 ->
+    (forall a b, 
+      In a l1 -> In b l2 -> P a b -> Q a b) ->
+    Forall2 Q l1 l2.
 Proof.
-  intros.
-  - apply in_app_or in H0.
-    apply in_or_app.
-    destruct H0.
-    + left. auto.
-    + right. apply H. auto.
-Qed.
-
-
-Lemma Rge_ne_gt:
-  forall r1 r2,
-    (r1 >= r2)%R ->
-    r1 <> r2 ->
-    (r1 > r2)%R.
-Proof.
-  intros.
-  destruct (Rgt_ge_dec r1 r2).
-  - auto.
-  - pose proof Rge_le r1 r2 H.
-    pose proof Rge_antisym _ _ H r.
-    contradiction.
-Qed.
-
-(*********************************************************)
-(**                                                      *)
-(** Probability Distribution                             *)
-(**                                                      *)
-(*********************************************************)
-
-Definition sum (l: list R): R :=
-  fold_right Rplus 0%R l.
-
-Definition sum_prob {A: Type} (pset: list A) (prob: A -> R): R :=
-  sum (map prob pset).
-
-Lemma sum_app:
-  forall (l1 l2: list R),
-    sum (l1 ++ l2) = (sum l1 + sum l2)%R.
-Proof.
-  intros.
-  induction l1.
-  - simpl.
-    lra.
-  - simpl.
-    rewrite IHl1.
-    lra.
-Qed.
-
-Lemma sum_map_add:
-  forall {A: Type},
-  forall (l: list A),
-    forall (f f1 f2: A -> R),
-    (forall a, f a = f1 a + f2 a)%R ->
-    (sum (map f l) = sum (map f1 l) + sum (map f2 l))%R.
-Proof.
-  intros.
-  induction l.
-  - simpl.
-    rewrite Rplus_0_r.
-    reflexivity.
-  - simpl.
-    rewrite IHl.
-    rewrite H.
-    lra.
-Qed.
-
-Lemma sum_map_zero:
-  forall {A: Type}
-         (l: list A)
-         (func: A -> R),
-    (forall a, In a l -> func a = 0%R) ->
-    sum (map func l) = 0%R.
-Proof.
-  intros.
-  induction l.
-  - simpl. reflexivity.
-  - simpl.
-    rewrite H.
-    2: {
-      left. reflexivity.
-    }
-    rewrite IHl.
-    lra.
-    intros.
-    apply H.
-    right. assumption.
-Qed.
-
-Lemma sum_map_sum_map:
-  forall (A B: Type) (la: list A) (lb: list B) (g: B -> A -> R),
-    sum (
-      map (fun a => 
-                sum (
-                  map (fun b => (g b) a) 
-                  lb)
-          )
-      la
-    )
-    =
-    sum (
-      map (fun b =>
-                sum (
-                  map (fun a => (g b) a) 
-                  la)
-          )
-      lb
-    ).
-Proof.
-  intros.
-  induction la as [| a la IHa], lb as [| b lb].
-  - simpl.
-    reflexivity.
-  - simpl.
-    enough (sum (map (fun _ : B => 0) lb) = 0)%R.
-    {
-      rewrite H.
-      rewrite Rplus_0_r; reflexivity.
-    }
-    induction lb.
-    + simpl; reflexivity.
-    + simpl; rewrite IHlb; rewrite Rplus_0_r; reflexivity.
-  - simpl.
-    enough (sum (map (fun _ : A => 0) la) = 0)%R.
-    {
-      rewrite H.
-      rewrite Rplus_0_r; reflexivity.
-    }
-    simpl in IHa.
-    assumption.
-  - simpl in *.
-
-    (* Search (?x + _ = ?x + _)%R. *)
-    (* SearchRewrite ((_ + _)+_)%R. *)
-    rewrite Rplus_assoc.
-    rewrite Rplus_assoc.
-    apply Rplus_eq_compat_l.
-    rewrite IHa.
-    rewrite Rplus_comm.
-    rewrite Rplus_assoc.
-    apply Rplus_eq_compat_l.
-    pose proof sum_map_add lb.
-    assert (
-      forall b: B,
-      (fun b0 : B => (g b0 a + sum (map (fun a0 : A => g b0 a0) la))%R) b =
-      (fun b0 : B => (sum (map (fun a0 : A => g b0 a0) la))%R) b
-      +
-      (fun b0 : B => (g b0 a)%R) b
-    )%R. {
+  intros A B l1 l2  P Q H_forall2 H_imp.
+  induction H_forall2.
+  - constructor.
+  - constructor.
+    + apply H_imp.
+      all: simpl; auto.
+    + apply IHH_forall2.
       intros.
-      lra.
-    }
-    specialize (H _ _ _ H0).
+      apply H_imp.
+      all: simpl; auto.
+Qed.
+
+
+Lemma map_map_eq_Forall2:
+  forall {A B C: Type} (l1: list A) (l2: list B) (f: A -> C) (g: B -> C),
+    Forall2 (fun a b => f a = g b) l1 l2 ->
+    map f l1 = map g l2.
+Proof.
+  intros A B C l1 l2 f g H_forall2.
+  induction H_forall2.
+  - reflexivity.
+  - simpl.
+    rewrite IHH_forall2.
     rewrite H.
     reflexivity.
 Qed.
 
-Lemma sum_map_multi:
-  forall {A: Type} (l: list A) (f: A -> R) (r: R),
-    sum (map (fun a => r * f a) l)%R = (r * sum (map f l))%R.
+Lemma In_combine_Forall2:
+  forall {A B: Type} (l1: list A) (l2: list B) (a: A) (b: B) (f: A -> B -> Prop),
+    In (a, b) (combine l1 l2) ->
+    Forall2 f l1 l2 ->
+    f a b.
 Proof.
   intros.
-  induction l.
-  - simpl.
-    lra.
-  - simpl.
-    rewrite IHl.
-    lra.
+  pose proof Forall2_to_forall _ _ _ H0.
+  rewrite Forall_forall in H1.
+  specialize (H1 (a, b) H).
+  simpl in *.
+  tauto.
 Qed.
 
-Module ProbDistr.
-
-Record Distr (A: Type): Type := {
-  prob: A -> R;
-  pset: list A;
-}.
-
-Arguments prob {_} _.
-Arguments pset {_} _.
-
-Record legal {A: Type} (d: Distr A): Prop := {
-  legal_no_dup: NoDup d.(pset);
-  legal_nonneg: forall a, (d.(prob) a >= 0)%R;
-  legal_pset_valid: forall a, (d.(prob) a > 0)%R -> In a d.(pset);
-  legal_prob_1: sum_prob d.(pset) d.(prob) = 1%R;
-  (* legal_pset_pos: forall a, In a d.(pset) -> (d.(prob) a > 0)%R; *)
-}.
-
-Definition equiv {A: Type} (d1 d2: Distr A): Prop :=
-  (forall a: A, d1.(prob) a = d2.(prob) a) /\
-  Permutation d1.(pset) d2.(pset).
-
-
-Definition is_det {A: Type} (a: A) (d: Distr A): Prop :=
-  d.(pset) = [a] /\ d.(prob) a = 1%R /\
-  forall b, (a <> b) -> d.(prob) b = 0%R.
-
-(** This definition should only be used when ds contains
-    positive probabilities. *)
-Record sum_distr {A: Type}
-                 (ds: list (R * Distr A))
-                 (d0: Distr A): Prop :=
-{
-  sum_pset_valid:
-    (* forall a, In a d0.(pset) <->
-              In a (concat (map (fun '(r, d) => d.(pset)) ds)); *)
-    Permutation
-        d0.(pset)
-      (
-        filter_dup
-        (concat (map (fun '(r, d) => d.(pset)) ds))
-      );
-
-  sum_prob_valid:
-    forall a, d0.(prob) a =
-              sum (map (fun '(r, d) => r * d.(prob) a) ds)%R;
-}.
-
-Definition compute_pr (d: Distr Prop) (r: R): Prop :=
-  exists (l: list Prop),
-    (forall P, In P l <-> In P d.(pset) /\ P) /\
-    (sum_prob l d.(prob) = r) /\
-    NoDup l.
-
-Definition imply_event (d1 d2: Distr Prop): Prop :=
-  exists r1 r2,
-    compute_pr d1 r1 /\
-    compute_pr d2 r2 /\
-    (r1 <= r2)%R.
-
-Definition equiv_event (d1 d2: Distr Prop): Prop :=
-  exists r1 r2,
-    compute_pr d1 r1 /\
-    compute_pr d2 r2 /\
-    (r1 = r2)%R.
-
-End ProbDistr.
-
-Notation "'Distr'" := (ProbDistr.Distr) (at level 0).
-Notation "x '.(pset)'" := (ProbDistr.pset x) (at level 1).
-Notation "x '.(prob)'" := (ProbDistr.prob x) (at level 1).
-Notation "x '.(legal_no_dup)'" := (ProbDistr.legal_no_dup _ x) (at level 1).
-Notation "x '.(legal_nonneg)'" := (ProbDistr.legal_nonneg _ x) (at level 1).
-Notation "x '.(legal_pset_valid)'" := (ProbDistr.legal_pset_valid _ x) (at level 1).
-Notation "x '.(legal_prob_1)'" := (ProbDistr.legal_prob_1 _ x) (at level 1).
-
-(* Lemmas *)
-
-Lemma not_in_pset_prob_0:
-  forall {A: Type} (d: Distr A) (a: A),
-    ProbDistr.legal d ->
-    ~ In a d.(pset) ->
-    d.(prob) a = 0%R.
+Lemma Forall2_in_combine:
+  forall {A B: Type} (l1: list A) (l2: list B) (f: A -> B -> Prop),
+    Forall2 f l1 l2 ->
+    forall a b, In (a, b) (combine l1 l2) -> f a b.
 Proof.
   intros.
-  destruct H.
-  destruct (Rge_dec (d.(prob) a) 0).
-  - destruct (Rle_dec (d.(prob) a) 0).
-    + lra.
-    + exfalso.
-      assert (d.(prob) a > 0)%R by lra.
-      pose proof legal_pset_valid a H.
-      contradiction.
-  - exfalso.
-    pose proof legal_nonneg a.
-    contradiction.
+  induction H.
+  - inversion H0.
+  - simpl in H0.
+    destruct H0.
+    + inversion H0.
+      subst.
+      auto.
+    + apply IHForall2 in H0.
+      auto.
 Qed.
 
-Definition make_det {A: Type} (a: A): Distr A :=
-  {| ProbDistr.prob := fun a' => if eq_dec a a' then 1%R else 0%R;
-     ProbDistr.pset := [a] |}.
-
-Lemma make_det_is_det:
-  forall {A: Type} (a: A),
-    ProbDistr.is_det a (make_det a).
+Lemma Forall2_in_combine_inv:
+  forall {A B: Type} (l1: list A) (l2: list B) (f: A -> B -> Prop),
+    length l1 = length l2 ->
+    (forall a b, In (a, b) (combine l1 l2) -> f a b)
+    -> Forall2 f l1 l2.
 Proof.
-  intros.
-  unfold ProbDistr.is_det.
-  split.
-  - simpl.
+  intros A B l1 l2 f Hlen Hf.
+  revert l2 Hlen Hf.
+  induction l1 as [| a l1' IH].
+  - intros.
+    assert (l2 = []) by (destruct l2; auto; inversion Hlen).
+    subst.
+    constructor.
+  - intros.
+    destruct l2 as [| b l2'].
+    + inversion Hlen.
+    + simpl in Hlen.
+      inversion Hlen.
+      constructor.
+      * apply Hf.
+        simpl; left; auto.
+      * apply IH; auto.
+        intros.
+        apply Hf.
+        simpl; right; auto.
+Qed.
+
+Lemma combine_exists:
+  forall {A B: Type} (l: list (A * B)),
+  exists l1 l2,
+    l = combine l1 l2.
+Proof.
+  intros A B l.
+  induction l as [| [a b] l IH].
+  - exists [], [].
     reflexivity.
-  - split.
-    + simpl.
-      destruct (eq_dec a a).
-      reflexivity.
-      contradiction.
-    + intros.
-      simpl.
-      destruct (eq_dec a b).
-      * subst.
-        contradiction.
-      * reflexivity.
+  - destruct IH as [l1 [l2 IH]].
+    exists (a :: l1), (b :: l2).
+    simpl.
+    rewrite IH.
+    reflexivity.
 Qed.
 
-Lemma sum_distr_exists:
-  forall {A: Type} (ds: list (R * Distr A)),
-    exists d0, ProbDistr.sum_distr ds d0.
+
+Lemma combine_Forall2:
+  forall {A B C: Type} (l1: list A) (l2: list B) (l3: list C) (f: A -> B -> C -> Prop),
+    length l1 = length l2 ->
+    length l1 = length l3 ->
+    (forall a b c,
+      In (a, b) (combine l1 l2) ->
+      In (a, c) (combine l1 l3) ->
+      f a b c ) ->
+    Forall2 (fun '(a, b) '(a', c) => a=a' /\ f a b c) (combine l1 l2) (combine l1 l3).
+Proof.
+Admitted.
+      
+
+#[export] Instance incl_perm_congr {A: Type}:
+  Proper (Permutation (A:=A) ==> Permutation (A:=A) ==> iff) (incl (A:=A)).
+Proof.
+  unfold Proper, respectful.
+  intros.
+  unfold incl.
+  split; intros.
+  - rewrite <- H in H2.
+    pose proof H1 _ H2.
+    rewrite <- H0.
+    auto.
+  - rewrite H in H2.
+    pose proof H1 _ H2.
+    rewrite H0.
+    auto.
+Qed.
+
+Lemma Permutation_filter_dup_concat_incl:
+  forall {A: Type} (l1: list A) (l2: list (list A)),
+    Permutation l1 (filter_dup (concat l2)) ->
+    (
+      forall l, In l l2 -> incl l l1
+    ).
 Proof.
   intros.
-  exists {| ProbDistr.prob := fun a => sum (map (fun '(r, d) => r * d.(prob) a) ds)%R;
-            ProbDistr.pset := filter_dup (concat (map (fun '(r, d) => d.(pset)) ds)) |}.
-  split.
+  apply in_listlist_concat_incl in H0.
+  rewrite H.
+  apply filter_dup_incl_list.
+  auto.
+Qed.
+
+Lemma Forall2_app_l_break_r:
+  forall {A B: Type} (l1a l1b: list A) (l2: list B) (f: A -> B -> Prop),
+    Forall2 f (l1a ++ l1b) l2 ->
+    exists l2a l2b,
+      l2 = (l2a ++ l2b) /\
+      Forall2 f l1a l2a /\
+      Forall2 f l1b l2b.
+Proof.
+  intros.
+  revert l2 H.
+  induction l1a as [|a l1a' IH].
+  - exists [], l2.
+    simpl in H.
+    split; auto.
+  - intros.
+    destruct l2 as [|b l2'].
+    + simpl in H.
+      inversion H.
+    + simpl in H.
+      inversion H.
+      apply IH in H5.
+      destruct H5 as [l2a [l2b [Hl2 [Hl2a Hl2b]]]].
+      exists (b :: l2a), l2b.
+      split; auto.
+      rewrite Hl2.
+      simpl.
+      reflexivity.
+Qed. 
+
+Lemma list_pair_partition_l:
+  forall {A B: Type} (l1: list A) (l2: list B) (l1flag: list A),
+  forall pred, Forall2 pred l1 l2 -> 
+    exists l1t l1o l2t l2o,
+      (* the two parts hold the Forall2 *)
+      Forall2 pred l1t l2t /\
+      Forall2 pred l1o l2o /\
+      (* pairs are moved together *)
+      Permutation (combine l1 l2) ((combine l1t l2t) ++ (combine l1o l2o)) /\
+      (* partition is make with respect to l1flag *)
+      (forall a, In a l1t -> In a l1flag) /\
+      (forall a, In a l1o -> ~ In a l1flag).
+Proof.
+Admitted.
+
+
+(** Partition and permutation of list *)
+
+Lemma app_combine_combine:
+  forall {A B: Type} (l1 l3: list A) (l2 l4: list B),
+    length l1 = length l2 ->
+    length l3 = length l4 ->
+    combine (l1 ++ l3) (l2 ++ l4) = (combine l1 l2) ++ (combine l3 l4).
+Proof.
+  intros.
+  revert l3 l2 l4 H H0.
+  induction l1 as [| a l1 IH].
+  - intros.
+    simpl in *.
+    assert (l2 = []). { destruct l2; auto. inversion H. }
+    subst.
+    simpl.
+    reflexivity.
+  - intros.
+    destruct l2 as [| b l2].
+    + 
+      inversion H.
+    + simpl.
+      f_equal.
+      apply IH.
+      * simpl in H.
+        injection H as H.
+        auto.
+      * simpl in H0.
+        auto.
+Qed.
+
+Lemma combine_fst:
+  forall {A B: Type} (l1: list A) (l2: list B),
+    length l1 = length l2 ->
+    map fst (combine l1 l2) = l1.
+Proof.
+  intros.
+  revert l2 H.
+  induction l1 as [| a l1 IH].
   - simpl.
     reflexivity.
   - intros.
-    simpl.
-    reflexivity.
+    destruct l2 as [| b l2].
+    + inversion H.
+    + simpl.
+      f_equal.
+      apply IH.
+      simpl in H.
+      injection H as H.
+      auto.
 Qed.
 
-(* Forall2
-               (fun '(r1, d1) '(r2, d2) =>
-                r1 = r2 /\ ProbDistr.equiv d1 d2) 
-  l1 l2 
-  holds, then sum_distr l1 ?d0 -> sum_distr l2 ?d0  
-  make it a proper instance *)              
-(* Lemma sum_distr_congr {A: Type}:
-  Proper (Forall2 (fun '(r1, d1) '(r2, d2) => r1 = r2 /\ ProbDistr.equiv d1 d2) ==> ProbDistr.equiv ==> iff) (@ProbDistr.sum_distr A).
-Proof.
-  unfold Proper, respectful.
-  intros l1 l2 Hl r1 r2 ?.
-  split; intros.
-  - destruct H0 as [Hpset Hprob]. *)
-(* Admitted. *)
-
-Lemma sum_distr_congr {A: Type}:
-  forall (l1 l2: list (R * Distr A)) (d0: Distr A),
-    Forall2 (fun '(r1, d1) '(r2, d2) => r1 = r2 /\ ProbDistr.equiv d1 d2) l1 l2 ->
-    ProbDistr.sum_distr l1 d0 <->
-    ProbDistr.sum_distr l2 d0.
-Proof.
-Admitted.
-
-Lemma sum_distr_congr_1 {A: Type}:
-  forall (l1 l2: list (R * Distr A)) (d0: Distr A),
-    Forall2 (fun '(r1, d1) '(r2, d2) => r1 = r2 /\ ProbDistr.equiv d1 d2) l1 l2 ->
-    ProbDistr.sum_distr l1 d0 ->
-    ProbDistr.sum_distr l2 d0.
-Proof.
-Admitted.
-
-Lemma sum_distr_congr_2 {A: Type}:
-  forall (l1 l2: list (R * Distr A)) (d0: Distr A),
-    Forall2 (fun '(r1, d1) '(r2, d2) => r1 = r2 /\ ProbDistr.equiv d1 d2) l1 l2 ->
-    ProbDistr.sum_distr l2 d0 ->
-    ProbDistr.sum_distr l1 d0.
-Proof.
-Admitted.
-
-
-(* permutation of ds is ok with sum_distr *)
-(* export as congr instance *)
-#[export] Instance sum_distr_perm {A: Type}:
-  Proper (Permutation (A:=(R * Distr A)) ==> eq ==> iff) (@ProbDistr.sum_distr A).
-Proof.
-  unfold Proper, respectful.
-  intros.
-Admitted.
-
-
-Lemma incl_nodup_perm:
-  forall {A: Type} (l1 l2: list A),
-    NoDup l1 ->
-    NoDup l2 ->
-    incl l1 l2 ->
-    incl l2 l1 ->
-    Permutation l1 l2.
+Lemma combine_snd:
+  forall {A B: Type} (l1: list A) (l2: list B),
+    length l1 = length l2 ->
+    map snd (combine l1 l2) = l2.
 Proof.
   intros.
-  apply NoDup_Permutation; auto.
+  revert l1 H.
+  induction l2 as [| a l2 IH].
+  - intros.
+    simpl.
+    assert (l1 = []) by (apply length_zero_iff_nil; auto).
+    subst.
+    reflexivity.
+  - intros.
+    destruct l1 as [| b l1].
+    + inversion H.
+    + simpl.
+      f_equal.
+      apply IH.
+      simpl in H.
+      injection H as H.
+      auto.
+Qed.
+
+Lemma Permutation_combine_cons:
+  forall {A B: Type} {la: list A} {lb: list B} {la1 lb1 la2 lb2},
+    length la = length lb ->
+    length la1 = length lb1 ->
+    length la2 = length lb2 ->
+    Permutation (combine la lb) ((combine la1 lb1) ++ (combine la2 lb2)) ->
+    Permutation la (la1 ++ la2) /\
+    Permutation lb (lb1 ++ lb2).
+Proof.
   intros.
-  unfold incl in *.
-  split; intros.
-  - auto.
-  - auto.
+  erewrite <- app_combine_combine in H2; eauto.
+  split.
+  - pose proof Permutation_map fst H2.
+    erewrite combine_fst in H3; eauto.
+    erewrite combine_fst in H3; eauto.
+    repeat rewrite app_length.
+    lia.
+  - pose proof Permutation_map snd H2.
+    erewrite combine_snd in H3; eauto.
+    erewrite combine_snd in H3; eauto.
+    repeat rewrite app_length.
+    lia.
+Qed.
+
+Lemma Forall2_perm_combine:
+  forall {A B: Type} l1 l1' l2 l2' (f: A -> B -> Prop),
+    length l1 = length l1' ->
+    length l1' = length l2' ->
+    Forall2 f l1 l2 ->
+    Permutation (combine l1 l2) (combine l1' l2') ->
+    Forall2 f l1' l2'.
+Proof.
+  intros A B l1 l1' l2 l2' f Hlen1 Hlen2 Hf Hperm.
+  eapply Forall2_in_combine_inv; eauto.
+  intros.
+  eapply Forall2_in_combine; eauto.
+  rewrite Hperm.
+  auto.
+Qed.
+
+
+Lemma Permutation_combine_wrt_left {A B: Type}:
+  forall (l1: list A) (l2: list B) (l1': list A),
+    length l1 = length l2 ->
+    Permutation l1 l1' ->
+    exists l2', 
+      Permutation l2 l2' /\
+      Permutation (combine l1 l2) (combine l1' l2').
+Proof.
+  intros l1 l2 l1' Hlength12 Hperm.
+  revert l2 Hlength12.
+  induction Hperm.
+  - intros l2 Hlength12.
+    assert (l2 = []) by (apply length_zero_iff_nil; auto).
+    subst; simpl in *.
+    exists [].
+    split; auto.
+  - intros l2 Hlength12.
+    destruct l2 as [| b l2]; [inversion Hlength12|].
+    assert (length l = length l2) as Hlength12'.
+    {
+      simpl in Hlength12.
+      lia.
+    }
+    specialize (IHHperm l2 Hlength12').
+    destruct IHHperm as [l2i [Hpermi Hcombinei]].
+    exists (b :: l2i).
+    split; auto.
+    simpl.
+    apply perm_skip.
+    auto.
+  - intros l2 Hlength12.
+    destruct l2 as [| b1 l2]; [inversion Hlength12|].
+    destruct l2 as [| b2 l2]; [inversion Hlength12|]. 
+    assert (length l = length l2) as Hlength12'.
+    {
+      simpl in Hlength12.
+      lia.
+    }
+    exists (b2 :: b1 :: l2).
+    split.
+    + constructor.
+    + simpl.
+      constructor.
+  - intros l2 Hlength12.
+    pose proof IHHperm1 l2 Hlength12 as [l2i1 [Hpermi1 Hcombinei1]].
+    assert (length l' = length l2i1) as Hlength12'.
+    {
+      rewrite <- Hperm1.
+      rewrite <- Hpermi1.
+      auto.
+    }
+    pose proof IHHperm2 l2i1 Hlength12' as [l2i2 [Hpermi2 Hcombinei2]].
+    exists l2i2.
+    split.
+    + transitivity l2i1; auto.
+    + transitivity (combine l' l2i1); auto.
 Qed.
 
 Lemma list_partition_in_notin:
@@ -1378,24 +1740,614 @@ Proof.
     tauto.
 Qed.
 
-
-#[export] Instance sum_congr :
-  Proper (Permutation (A:=R) ==> eq) (sum).
+Lemma combine_permutation_l_exists_holds:
+  forall {A B: Type} (l1: list A) (l2: list B)
+    (l1': list A) pred,
+    Forall2 pred l1 l2 ->
+    Permutation l1 l1' ->
+    exists l2',
+      Permutation l2 l2' /\
+      Permutation (combine l1 l2) (combine l1' l2') /\
+      (* Forall2 still holds *)
+      Forall2 pred l1' l2'.
 Proof.
-  unfold Proper, respectful.
-  intros l1 l2 H.
+  intros.
+    pose proof Permutation_combine_wrt_left l1 l2 l1' as Hi.
+    specialize (Hi (F2_sl H) H0).
+    destruct Hi as [l2' [H_perm_l2' H_perm_combine]].
+    exists l2'.
+    split.
+    - auto.
+    - split; auto.
+      pose proof Permutation_length H_perm_l2'.
+      pose proof Permutation_length H0.
+      pose proof F2_sl H.
+      eapply (Forall2_perm_combine l1 l1' l2 l2'); auto.
+      lia.
+Qed.
+
+Lemma Forall2_perm_l_exists:
+  forall {A B: Type} (l1: list A) (l2: list B) (f: A -> B -> Prop) (l1': list A),
+    Permutation l1 l1' ->
+    Forall2 f l1 l2 ->
+    exists l2', Permutation l2 l2' /\ Forall2 f l1' l2'.
+Proof.
+  intros.
+  intros.
+  pose proof combine_permutation_l_exists_holds l1 l2 l1' f H0 H as [l2' [? [? ?]]].
+  exists l2'; repeat split; auto.
+Qed.
+
+Lemma combine_perm_l_exists:
+  forall {A B: Type} (l1: list A) (l2: list B) (l1': list A),
+  forall pred, 
+    Forall2 pred l1 l2 ->
+    Permutation l1 l1' ->
+    exists l2',
+      length l2 = length l2' /\
+      Permutation (combine l1 l2) (combine l1' l2') /\
+      Forall2 pred l1' l2'.
+Proof.
+  intros.
+  pose proof combine_permutation_l_exists_holds l1 l2 l1' pred H H0 as [l2' [? [? ?]]].
+  exists l2'; repeat split; auto.
+  apply Permutation_length; auto.
+Qed.
+
+
+(** Other lemmas *)
+
+Lemma In_in_concat_map {A B: Type}:
+  forall (l: list A) (f: A -> list B) (b: B),
+    (exists a, In a l /\ In b (f a)) ->
+    In b (concat (map f l)).
+Proof.
+  intros.
+  destruct H as [a [? ?]].
+  apply in_concat.
+  exists (f a).
+  split; auto.
+  apply in_map_iff.
+  exists a.
+  auto.
+Qed.
+
+Lemma in_in_app_app:
+  forall {A: Type} (a: A) (l1 l2 l0: list A),
+    (
+      In a l1 -> In a l2
+    ) ->
+    (
+      In a (l0 ++ l1) -> In a (l0 ++ l2)
+    ).
+Proof.
+  intros.
+  - apply in_app_or in H0.
+    apply in_or_app.
+    destruct H0.
+    + left. auto.
+    + right. apply H. auto.
+Qed.
+
+
+Lemma Rge_ne_gt:
+  forall r1 r2,
+    (r1 >= r2)%R ->
+    r1 <> r2 ->
+    (r1 > r2)%R.
+Proof.
+  intros.
+  destruct (Rgt_ge_dec r1 r2).
+  - auto.
+  - pose proof Rge_le r1 r2 H.
+    pose proof Rge_antisym _ _ H r.
+    contradiction.
+Qed.
+
+(*********************************************************)
+(**                                                      *)
+(** Properties of sum                                    *)
+(**                                                      *)
+(*********************************************************)
+
+Definition sum (l: list R): R :=
+  fold_right Rplus 0%R l.
+
+Definition sum_prob {A: Type} (pset: list A) (prob: A -> R): R :=
+  sum (map prob pset).
+
+Lemma sum_app:
+  forall (l1 l2: list R),
+    sum (l1 ++ l2) = (sum l1 + sum l2)%R.
+Proof.
+  intros.
+  induction l1.
+  - simpl.
+    lra.
+  - simpl.
+    rewrite IHl1.
+    lra.
+Qed.
+
+Lemma sum_map_add:
+  forall {A: Type},
+  forall (l: list A),
+    forall (f f1 f2: A -> R),
+    (forall a, f a = f1 a + f2 a)%R ->
+    (sum (map f l) = sum (map f1 l) + sum (map f2 l))%R.
+Proof.
+  intros.
+  induction l.
+  - simpl.
+    rewrite Rplus_0_r.
+    reflexivity.
+  - simpl.
+    rewrite IHl.
+    rewrite H.
+    lra.
+Qed.
+
+Lemma sum_map_zero:
+  forall {A: Type}
+         (l: list A)
+         (func: A -> R),
+    (forall a, In a l -> func a = 0%R) ->
+    sum (map func l) = 0%R.
+Proof.
+  intros.
+  induction l.
+  - simpl. reflexivity.
+  - simpl.
+    rewrite H.
+    2: {
+      left. reflexivity.
+    }
+    rewrite IHl.
+    lra.
+    intros.
+    apply H.
+    right. assumption.
+Qed.
+
+Lemma sum_map_ge_zero:
+  forall {A: Type}
+         (l: list A)
+         (func: A -> R),
+    (forall a, In a l -> (func a >= 0)%R) ->
+    (sum (map func l) >= 0)%R.
+Proof.
+  intros.
+  induction l.
+  - simpl. lra.
+  - simpl.
+    assert (H0: (func a >= 0)%R). {
+      apply H.
+      left. reflexivity.
+    }
+    assert (H1: (sum (map func l) >= 0)%R). {
+      apply IHl.
+      intros.
+      apply H.
+      right. assumption.
+    }
+    lra.
+Qed.
+
+Lemma sum_map_sum_map:
+  forall (A B: Type) (la: list A) (lb: list B) (g: B -> A -> R),
+    sum (
+      map (fun a => 
+                sum (
+                  map (fun b => (g b) a) 
+                  lb)
+          )
+      la
+    )
+    =
+    sum (
+      map (fun b =>
+                sum (
+                  map (fun a => (g b) a) 
+                  la)
+          )
+      lb
+    ).
+Proof.
+  intros.
+  induction la as [| a la IHa], lb as [| b lb].
+  - simpl.
+    reflexivity.
+  - simpl.
+    enough (sum (map (fun _ : B => 0) lb) = 0)%R.
+    {
+      rewrite H.
+      rewrite Rplus_0_r; reflexivity.
+    }
+    induction lb.
+    + simpl; reflexivity.
+    + simpl; rewrite IHlb; rewrite Rplus_0_r; reflexivity.
+  - simpl.
+    enough (sum (map (fun _ : A => 0) la) = 0)%R.
+    {
+      rewrite H.
+      rewrite Rplus_0_r; reflexivity.
+    }
+    simpl in IHa.
+    assumption.
+  - simpl in *.
+
+    (* Search (?x + _ = ?x + _)%R. *)
+    (* SearchRewrite ((_ + _)+_)%R. *)
+    rewrite Rplus_assoc.
+    rewrite Rplus_assoc.
+    apply Rplus_eq_compat_l.
+    rewrite IHa.
+    rewrite Rplus_comm.
+    rewrite Rplus_assoc.
+    apply Rplus_eq_compat_l.
+    pose proof sum_map_add lb.
+    assert (
+      forall b: B,
+      (fun b0 : B => (g b0 a + sum (map (fun a0 : A => g b0 a0) la))%R) b =
+      (fun b0 : B => (sum (map (fun a0 : A => g b0 a0) la))%R) b
+      +
+      (fun b0 : B => (g b0 a)%R) b
+    )%R. {
+      intros.
+      lra.
+    }
+    specialize (H _ _ _ H0).
+    rewrite H.
+    reflexivity.
+Qed.
+
+Lemma sum_map_multi:
+  forall {A: Type} (l: list A) (f: A -> R) (r: R),
+    sum (map (fun a => r * f a) l)%R = (r * sum (map f l))%R.
+Proof.
+  intros.
+  induction l.
+  - simpl.
+    lra.
+  - simpl.
+    rewrite IHl.
+    lra.
+Qed.
+
+Lemma sum_perm:
+  forall (l1 l2: list R),
+    Permutation l1 l2 ->
+    sum l1 = sum l2.
+Proof.
+  intros.
   induction H.
   - reflexivity.
   - simpl.
-    f_equal.
-    assumption.
-  - simpl.
-    rewrite Rplus_comm.
-    rewrite Rplus_assoc.
-    f_equal.
-    rewrite Rplus_comm.
+    rewrite IHPermutation.
     reflexivity.
-  - transitivity (sum l'); assumption.
+  - simpl.
+    lra.
+  - rewrite IHPermutation1.
+    rewrite IHPermutation2.
+    reflexivity.
+Qed.
+
+#[export] Instance sum_congr:
+  Proper (Permutation (A:=R) ==> eq) sum.
+Proof.
+  unfold Proper, respectful.
+  intros.
+  apply sum_perm.
+  auto.
+Qed.
+
+(*********************************************************)
+(**                                                      *)
+(** Probability Distribution                             *)
+(**                                                      *)
+(*********************************************************)
+
+Module ProbDistr.
+
+Record Distr (A: Type): Type := {
+  prob: A -> R;
+  pset: list A;
+}.
+
+Arguments prob {_} _.
+Arguments pset {_} _.
+
+Record legal {A: Type} (d: Distr A): Prop := {
+  legal_no_dup: NoDup d.(pset);
+  legal_nonneg: forall a, (d.(prob) a >= 0)%R;
+  legal_pset_valid: forall a, (d.(prob) a > 0)%R -> In a d.(pset);
+  legal_prob_1: sum_prob d.(pset) d.(prob) = 1%R;
+  (* legal_pset_pos: forall a, In a d.(pset) -> (d.(prob) a > 0)%R; *)
+}.
+
+Definition equiv {A: Type} (d1 d2: Distr A): Prop :=
+  (forall a: A, d1.(prob) a = d2.(prob) a) /\
+  Permutation d1.(pset) d2.(pset).
+
+
+Definition is_det {A: Type} (a: A) (d: Distr A): Prop :=
+  d.(pset) = [a] /\ d.(prob) a = 1%R /\
+  forall b, (a <> b) -> d.(prob) b = 0%R.
+
+(** This definition should only be used when ds contains
+    positive probabilities. *)
+Record sum_distr {A: Type}
+                 (ds: list (R * Distr A))
+                 (d0: Distr A): Prop :=
+{
+  sum_pset_valid:
+    (* forall a, In a d0.(pset) <->
+              In a (concat (map (fun '(r, d) => d.(pset)) ds)); *)
+    Permutation
+        d0.(pset)
+      (
+        filter_dup
+        (concat (map (fun '(r, d) => d.(pset)) ds))
+      );
+
+  sum_prob_valid:
+    forall a, d0.(prob) a =
+              sum (map (fun '(r, d) => r * d.(prob) a) ds)%R;
+}.
+
+Definition compute_pr (d: Distr Prop) (r: R): Prop :=
+  exists (l: list Prop),
+    (forall P, In P l <-> In P d.(pset) /\ P) /\
+    (sum_prob l d.(prob) = r) /\
+    NoDup l.
+
+Definition imply_event (d1 d2: Distr Prop): Prop :=
+  exists r1 r2,
+    compute_pr d1 r1 /\
+    compute_pr d2 r2 /\
+    (r1 <= r2)%R.
+
+Definition equiv_event (d1 d2: Distr Prop): Prop :=
+  exists r1 r2,
+    compute_pr d1 r1 /\
+    compute_pr d2 r2 /\
+    (r1 = r2)%R.
+
+End ProbDistr.
+
+Notation "'Distr'" := (ProbDistr.Distr) (at level 0).
+Notation "x '.(pset)'" := (ProbDistr.pset x) (at level 1).
+Notation "x '.(prob)'" := (ProbDistr.prob x) (at level 1).
+Notation "x '.(legal_no_dup)'" := (ProbDistr.legal_no_dup _ x) (at level 1).
+Notation "x '.(legal_nonneg)'" := (ProbDistr.legal_nonneg _ x) (at level 1).
+Notation "x '.(legal_pset_valid)'" := (ProbDistr.legal_pset_valid _ x) (at level 1).
+Notation "x '.(legal_prob_1)'" := (ProbDistr.legal_prob_1 _ x) (at level 1).
+
+(* Lemmas *)
+
+Lemma sum_distr_nil_prob_zero:
+  forall (ds : Distr Prop),
+    ProbDistr.sum_distr [] ds ->
+    ProbDistr.compute_pr ds 0.
+Proof.
+  intros.
+  destruct H as [H1 H2].
+  simpl in *.
+  assert (ds.(pset) = []). {
+    unfold empty_set in H1.
+    eapply Permutation_nil.
+    symmetry; auto.
+  }
+  unfold ProbDistr.compute_pr.
+  rewrite H.
+  exists [].
+  split; auto.
+  - intros.
+    split.
+    + intros.
+      inversion H0.
+    + intros.
+      destruct H0.
+      inversion H0.
+  - unfold sum_prob.
+    simpl.
+    split; auto.
+    constructor.
+Qed.
+
+Lemma not_in_pset_prob_0:
+  forall {A: Type} (d: Distr A) (a: A),
+    ProbDistr.legal d ->
+    ~ In a d.(pset) ->
+    d.(prob) a = 0%R.
+Proof.
+  intros.
+  destruct H.
+  destruct (Rge_dec (d.(prob) a) 0).
+  - destruct (Rle_dec (d.(prob) a) 0).
+    + lra.
+    + exfalso.
+      assert (d.(prob) a > 0)%R by lra.
+      pose proof legal_pset_valid a H.
+      contradiction.
+  - exfalso.
+    pose proof legal_nonneg a.
+    contradiction.
+Qed.
+
+Definition make_det {A: Type} (a: A): Distr A :=
+  {| ProbDistr.prob := fun a' => if eq_dec a a' then 1%R else 0%R;
+     ProbDistr.pset := [a] |}.
+
+Lemma make_det_is_det:
+  forall {A: Type} (a: A),
+    ProbDistr.is_det a (make_det a).
+Proof.
+  intros.
+  unfold ProbDistr.is_det.
+  split.
+  - simpl.
+    reflexivity.
+  - split.
+    + simpl.
+      destruct (eq_dec a a).
+      reflexivity.
+      contradiction.
+    + intros.
+      simpl.
+      destruct (eq_dec a b).
+      * subst.
+        contradiction.
+      * reflexivity.
+Qed.
+
+Lemma sum_distr_exists:
+  forall {A: Type} (ds: list (R * Distr A)),
+    exists d0, ProbDistr.sum_distr ds d0.
+Proof.
+  intros.
+  exists {| ProbDistr.prob := fun a => sum (map (fun '(r, d) => r * d.(prob) a) ds)%R;
+            ProbDistr.pset := filter_dup (concat (map (fun '(r, d) => d.(pset)) ds)) |}.
+  split.
+  - simpl.
+    reflexivity.
+  - intros.
+    simpl.
+    reflexivity.
+Qed.
+
+
+Lemma sum_distr_congr_1 {A: Type}:
+  forall (l1 l2: list (R * Distr A)) (d0: Distr A),
+    Forall2 (fun '(r1, d1) '(r2, d2) => r1 = r2 /\ ProbDistr.equiv d1 d2) l1 l2 ->
+    ProbDistr.sum_distr l1 d0 ->
+    ProbDistr.sum_distr l2 d0.
+Proof.
+  intros l1 l2 d H Hl1.
+  split.
+  {
+    destruct Hl1 as [Hl1 _].
+    rewrite Hl1.
+    clear Hl1.
+    remember (fun '(_, d0) => d0.(pset)) as func.
+    enough (perm_filter_dup (concat (map func l1)) (concat (map func l2))). {
+      unfold perm_filter_dup in *.
+      auto.
+    }
+    apply Permutation_filter_dup_concat_congr.
+    induction H as [| [r1 d1] [r2 d2] l1 l2 H IH].
+    - simpl.
+      constructor.
+    - simpl.
+      constructor.
+      + destruct H.
+        subst.
+        destruct H0; auto.
+      + apply IHIH.
+  }
+  {
+    intros a.
+    destruct Hl1 as [_ Hl1].
+    rewrite Hl1.
+    f_equal.
+    clear Hl1.
+    induction H as [| [r1 d1] [r2 d2] l1 l2 H IH].
+    - simpl.
+      reflexivity.
+    - simpl.
+      f_equal.
+      + destruct H.
+        destruct H0.
+        subst.
+        rewrite H0.
+        reflexivity.
+      + apply IHIH.
+  }
+Qed.
+
+Lemma sum_distr_congr_2 {A: Type}:
+  forall (l1 l2: list (R * Distr A)) (d0: Distr A),
+    Forall2 (fun '(r1, d1) '(r2, d2) => r1 = r2 /\ ProbDistr.equiv d1 d2) l1 l2 ->
+    ProbDistr.sum_distr l2 d0 ->
+    ProbDistr.sum_distr l1 d0.
+Proof.
+  intros l1 l2 d H Hl2.
+  eapply sum_distr_congr_1; eauto.
+  clear Hl2.
+  induction H.
+  - constructor.
+  - constructor.
+    + destruct x, y; simpl.
+      destruct H.
+      split; auto.
+      destruct H1; split; auto.
+      symmetry; auto.
+    + apply IHForall2.
+Qed.
+
+
+Lemma sum_distr_congr {A: Type}:
+  forall (l1 l2: list (R * Distr A)) (d0: Distr A),
+    Forall2 (fun '(r1, d1) '(r2, d2) => r1 = r2 /\ ProbDistr.equiv d1 d2) l1 l2 ->
+    ProbDistr.sum_distr l1 d0 <->
+    ProbDistr.sum_distr l2 d0.
+Proof.
+  intros.
+  split.
+  - apply sum_distr_congr_1; auto.
+  - apply sum_distr_congr_2; auto.
+Qed.
+
+
+(* permutation of ds is ok with sum_distr *)
+(* export as congr instance *)
+#[export] Instance sum_distr_perm {A: Type}:
+  Proper (Permutation (A:=(R * Distr A)) ==> eq ==> iff) (@ProbDistr.sum_distr A).
+Proof.
+  unfold Proper, respectful.
+  intros.
+  subst.
+  split; intros.
+  - destruct H0.
+    split.
+    {
+      clear sum_prob_valid.
+      rewrite sum_pset_valid.
+      clear sum_pset_valid.
+      apply perm_filter_dup_concat_perm.
+      apply Permutation_map.
+      apply H.
+    }
+    {
+      clear sum_pset_valid.
+      intros.
+      rewrite sum_prob_valid.
+      clear sum_prob_valid.
+      apply sum_perm.
+      apply Permutation_map.
+      apply H.
+    }
+  - destruct H0.
+    split.
+    {
+      clear sum_prob_valid.
+      rewrite sum_pset_valid.
+      clear sum_pset_valid.
+      apply perm_filter_dup_concat_perm.
+      apply Permutation_map.
+      symmetry.
+      apply H.
+    }
+    {
+      clear sum_pset_valid.
+      intros.
+      rewrite sum_prob_valid.
+      clear sum_prob_valid.
+      apply sum_perm.
+      apply Permutation_map.
+      symmetry.
+      apply H.
+    }
 Qed.
 
 Lemma perm_map:
@@ -1532,6 +2484,7 @@ Proof.
   }
 Qed.
 
+(* Level 1 *)
 Theorem ProbDistr_compute_pr_exists: forall d, exists r,
   ProbDistr.compute_pr d r.
 Proof.
@@ -1619,8 +2572,8 @@ Proof.
         rewrite H0.
         auto.
 Qed. 
-  
-(** Level 1 *)
+
+
 Definition valid_prop_sublist(l t: list Prop): Prop :=
   forall P, In P t <-> In P l /\ P.
 
@@ -1698,6 +2651,7 @@ Proof.
     reflexivity.
 Qed.
 
+(** Level 1 *)
 #[export] Instance ProbDistr_imply_event_refl:
   Reflexive ProbDistr.imply_event.
 Proof.
@@ -1709,9 +2663,10 @@ Proof.
   apply Rle_refl.
 Qed.
 
+(** Level 1 *)
 Theorem ProbDistr_imply_event_refl_setoid:
   forall d1 d2, ProbDistr.equiv_event d1 d2 -> ProbDistr.imply_event d1 d2.
-Proof. (** Level 1 *)
+Proof.
   intros.
   unfold ProbDistr.equiv_event, ProbDistr.imply_event in *.
   destruct H as [r1 [r2 [? [? ?]]]].
@@ -1721,9 +2676,10 @@ Proof. (** Level 1 *)
   apply Rle_refl.
 Qed.
 
+(** Level 1 *)
 #[export] Instance ProbDistr_equiv_equiv {A: Type}:
   Equivalence (@ProbDistr.equiv A).
-Proof. (** Level 1 *)
+Proof. 
   unfold ProbDistr.equiv.
   split.
   - unfold Reflexive.
@@ -1746,8 +2702,7 @@ Proof. (** Level 1 *)
     (* + Search (Permutation _ _ -> Permutation _ _ -> Permutation _ _).  *)
 Qed.
 
-
-
+(** Level 1 *)
 #[export] Instance ProbDistr_imply_event_trans:
   Transitive ProbDistr.imply_event.
 Proof.
@@ -1774,6 +2729,7 @@ Proof.
     auto.    
 Qed.
 
+(** Level 1 *)
 #[export] Instance ProbDistr_equiv_event_equiv:
   Equivalence ProbDistr.equiv_event.
 Proof.
@@ -1803,6 +2759,7 @@ Proof.
     apply compute_pr_same with (d := y); auto.
 Qed.
 
+(** Level 1 *)
 #[export] Instance ProbDistr_imply_event_congr:
   Proper (ProbDistr.equiv_event ==>
           ProbDistr.equiv_event ==> iff) ProbDistr.imply_event.
@@ -1840,6 +2797,7 @@ Proof.
       auto.
 Qed.  
 
+(** Level 1 *)
 #[export] Instance ProbDistr_compute_pr_congr:
   Proper (ProbDistr.equiv_event ==> Sets.equiv) ProbDistr.compute_pr.
 Proof.
@@ -1858,6 +2816,7 @@ Proof.
     auto.
 Qed.
 
+(** Level 1 *)
 Theorem ProbDistr_compute_pr_mono:
   forall f1 f2 r1 r2,
     ProbDistr.compute_pr f1 r1 ->
@@ -2680,78 +3639,6 @@ Notation "x '.(Legal_congr)'" := (ProbMonad.Legal_congr _ x) (at level 1).
 Definition Always {A: Type} (c: ProbMonad.M A) (P: A -> Prop): Prop :=
   Hoare (ProbMonad.compute_pr (res <- c;; ret (P res))) (fun pr => pr = 1%R).
 
-Lemma Forall2_to_forall:
-  forall {A B: Type} (l1: list A) (l2: list B) (f: A -> B -> Prop),
-    Forall2 f l1 l2 ->
-    Forall (fun '(a, b) => f a b) (combine l1 l2).
-Proof.
-  intros.
-  induction H.
-  - constructor.
-  - simpl.
-    constructor; auto.
-Qed.
-
-Lemma perm_filter_dup_notin:
-  forall {A: Type} (l: list A) (a: A),
-    ~ In a (filter_dup l) ->
-    Permutation (filter_dup (a :: l)) (a :: filter_dup l).
-Admitted.
-
-Lemma perm_filter_dup_in:
-  forall {A: Type} (l: list A) (a: A),
-    In a (filter_dup l) ->
-    Permutation (filter_dup (a :: l)) (filter_dup l).
-Admitted.
-
-Lemma in_exists_remaining_list_perm:
-  forall {A: Type} (l: list A) (a: A) ,
-    In a l -> exists l', Permutation l (a :: l').
-Proof.
-  induction l.
-  - contradiction.
-  - intros.
-    destruct H.
-    + subst.
-      exists l.
-      apply Permutation_refl.
-    + specialize (IHl a0 H).
-      destruct IHl as [l' H_perm].
-      exists (a :: l').
-      (* Search Permutation. *)
-      pose proof perm_swap a a0 l' as H_swap.
-      pose proof Permutation_trans.
-      specialize (H0 A (a :: l) (a :: a0 :: l') (a0 :: a :: l')).
-      apply H0.
-      * apply Permutation_cons; auto.
-      * apply Permutation_sym.
-        apply H_swap.
-Qed.
-
-Lemma in_map_eq:
-  forall {A B: Type} (f: A -> B) (g: A -> B) (l: list A),
-    (forall a, In a l -> f a = g a) -> 
-    map f l = map g l.
-Proof.
-  intros.
-  induction l.
-  - reflexivity.
-  - simpl.
-    f_equal.
-    + apply H.
-      simpl; auto.
-    + apply IHl.
-      intros.
-      apply H.
-      simpl; auto.
-Qed.
-
-Lemma not_in_filter_dup_remove:
-  forall {A: Type} (l1 l2: list A) (a: A),
-    ~ In a (filter_dup (l1 ++ l2)) -> ~ In a (filter_dup l2).
-Proof.
-Admitted.
-
 Lemma prob_zero_1:
   forall {A: Type} (l: list (R * Distr Prop)) (d0: Distr Prop) (la: list A) (dA: Distr A) (Q: A -> Prop) (a: A),
     ProbDistr.sum_distr l d0 ->
@@ -3197,76 +4084,7 @@ Proof.
         rewrite H5.
         lra.
 Qed.
-        
-(* Lemma sum_distr_prob_nonneg:
-  forall {A: Type} (dA: Distr A) (dP: Distr Prop) (P: A -> Prop) (lP: list (R * Distr Prop)),
-    ProbDistr.legal dA ->
-    Forall2
-      (fun (a : A) '(r, d0) =>
-      r = dA.(prob) a /\
-      d0.(pset) = [P a] /\
-      d0.(prob) (P a) = 1%R /\
-      (forall b : Prop, P a <> b -> d0.(prob) b = 0%R))
-    dA.(pset) lP ->
-    ProbDistr.sum_distr lP dP ->
-    (forall a, In a dA.(pset) -> dP.(prob) (P a) >= 0)%R.
-Proof.
-  intros A dA.
-  induction dA.(pset) as [| a1 l IH].
-  - intros.
-    contradiction.
-  - intros.
-    destruct lP as [| [r d] lP'].
-    + inversion H0.
-    + inversion H0.
-      subst.
-      destruct H1 as [Hpset Hprob].
-      simpl in Hprob.
-      set (dP'_pset := filter_dup (concat (map (fun '(_, d) => d.(pset)) lP'))).
-      set (dP'_prob := fun Pa => sum (map (fun '(r0, d) => (r0 * d.(prob) Pa)%R) lP')).
-      set (dP' := {| ProbDistr.pset := dP'_pset; ProbDistr.prob := dP'_prob; |}).
-      assert (ProbDistr.sum_distr lP' dP') as H_sum_dP'. {
-        split; auto.
-      }
-      assert (r >= 0)%R. {
-        destruct H as [? ? ? ?].
-        specialize (legal_nonneg a1).
-        assert (r = dA.(prob) a1) by apply H6.
-        lra.
-      }
-      assert (r * d.(prob) (P a) >= 0)%R. {
-        destruct (eq_dec (P a) (P a1)) as [Heq | Hneq].
-        - assert (d.(prob) (P a1) = 1%R) by apply H6.
-          rewrite <- Heq in H3.
-          rewrite H3.
-          lra.
-        - assert (d.(prob) (P a) = 0%R). {
-            apply H6.
-            auto.
-          }
-          rewrite H3.
-          lra.
-      }
-      destruct H2.
-      * subst a.
-        specialize (Hprob (P a1)).
-        assert (r = dA.(prob) a1) by apply H6.
-        assert (d.(prob) (P a1) = 1%R) by apply H6.
-        rewrite H2, H4 in Hprob.
-        assert (sum (map (fun '(r, d) => r * d.(prob) (P a1)) lP') >= 0)%R. {
-          
-          apply sum_distr_prob_sum_nonneg with (dA := dA) (dP := dP') (P := P) (lP := lP'); auto.
-        }
-        rewrite Hprob, <- H2.
-        lra.
-      * specialize (IH dP' P lP' H H8 H_sum_dP' a H2).
-        unfold dP' in IH.
-        simpl in IH.
-        unfold dP'_prob in IH.
-        specialize (Hprob (P a)).
-        
-        lra.
-  Admitted. *)
+
 
 Lemma split_zero_and_pos_from_nonneg_list:
   forall {A: Type} (l: list A) (f: A -> R) (r: R),
@@ -3344,16 +4162,100 @@ Lemma nonneg_sublist_sum_le:
     (forall a, In a l -> f a >= 0)%R ->
     sum (map f l) = r ->
     incl subl l ->
+    NoDup subl ->
+    NoDup l ->
     (sum (map f subl) <= r)%R.
-Admitted.
+Proof.
+  intros.
+  pose proof list_partition_in_notin subl l as H_partition.
+  destruct H_partition as [l_in [l_notin [H_perm [H_in H_notin]]]].
+  subst r.
+  rewrite <- H_perm.
+  rewrite map_app.
+  rewrite sum_app.
+  assert (Permutation subl l_in) as H_perm_subl_l_in. {
+    unfold incl in H1.
+    apply NoDup_Permutation.
+    - assumption.
+    - eapply perm_nodup_app_l.
+      apply H_perm.
+      assumption.
+    - intros.
+      split.
+      + intros H_in_subl.
+        destruct (in_dec eq_dec x l_notin) as [H_in_notin | H_notin_notin].
+        * apply H_notin in H_in_notin.
+          contradiction.
+        * apply H1 in H_in_subl.
+          rewrite <- H_perm in H_in_subl.
+          apply in_app_or in H_in_subl.
+          destruct H_in_subl; auto; contradiction.
+      + intros H_in_l_in.
+        apply H_in; auto.
+  }
+  rewrite H_perm_subl_l_in.
+  enough (sum (map f l_notin) >= 0)%R by lra.
+  apply sum_map_ge_zero.
+  intros.
+  assert (In a l). {
+    eapply Permutation_in.
+    apply H_perm.
+    apply in_app_iff.
+    auto.
+  }
+  apply H.
+  apply H4.
+Qed.
 
 Lemma nonneg_sublist_sum_ge:
   forall {A: Type} (l: list A) (f: A -> R) (r: R) (subl: list A),
     (forall a, In a l -> f a >= 0)%R ->
     sum (map f subl) = r ->
     incl subl l ->
+    NoDup subl ->
+    NoDup l ->
     (sum (map f l) >= r)%R.
-Admitted.
+Proof.
+  intros.
+  pose proof list_partition_in_notin subl l as H_partition.
+  destruct H_partition as [l_in [l_notin [H_perm [H_in H_notin]]]].
+  unfold incl in *.
+  assert (Permutation subl l_in) as H_perm_subl_l_in. {
+    apply NoDup_Permutation.
+    - assumption.
+    - eapply perm_nodup_app_l.
+      apply H_perm.
+      assumption.
+    - intros.
+      split.
+      + intros H_in_subl.
+        destruct (in_dec eq_dec x l_notin) as [H_in_notin | H_notin_notin].
+        * apply H_notin in H_in_notin.
+          contradiction.
+        * apply H1 in H_in_subl.
+          rewrite <- H_perm in H_in_subl.
+          apply in_app_or in H_in_subl.
+          destruct H_in_subl; auto; contradiction.
+      + intros H_in_l_in.
+        apply H_in; auto.
+  }
+  rewrite <- H_perm.
+  subst.
+  rewrite H_perm_subl_l_in.
+  rewrite map_app.
+  rewrite sum_app.
+  enough (sum (map f l_notin) >= 0)%R by lra.
+  apply sum_map_ge_zero.
+  intros.
+  assert (In a l). {
+    eapply Permutation_in.
+    apply H_perm.
+    apply in_app_iff.
+    auto.
+  }
+  apply H.
+  apply H4.
+Qed.
 
 Lemma sumup_incl:
   forall {A: Type} (zero_list pos_list l: list A) (f: A -> R) (r: R),
@@ -3521,60 +4423,6 @@ Proof.
         lra.
 Qed.
 
-(* Lemma always_conseq_2:
-  forall {A: Type} (dA: Distr A) (a: A) (dQ: Distr Prop) (Q: A -> Prop) (lQ: list (R * Distr Prop)), 
-    Forall2
-      (fun (a : A) '(r, d) =>
-      r = dA.(prob) a /\
-      d.(pset) = [Q a] /\
-      d.(prob) (Q a) = 1%R /\
-      (forall b : Prop, Q a <> b -> d.(prob) b = 0%R)) dA.(pset) lQ ->
-    ProbDistr.sum_distr lQ dQ ->
-    (dQ.(prob) (Q a) > 0)%R ->
-    (dA.(prob) a > 0)%R.
-Proof.
-  intros A dA.
-  induction dA.(pset) as [| a1 l IH].
-  + intros.
-    pose proof Forall2_same_length _ _ _ H as H_same_length.
-    assert (lQ = []) as H_lQ_empty. {
-      apply length_zero_iff_nil.
-      simpl in H_same_length.
-      auto.
-    }
-    subst.
-    destruct H0 as [? ?].
-    simpl in sum_prob_valid.
-    specialize (sum_prob_valid (Q a)).
-    lra.
-  + intros.
-    destruct lQ as [| [r d] lQ'].
-    - inversion H.
-    - inversion H.
-      subst.
-      destruct H0 as [Hpset Hprob].
-      simpl in Hprob.
-      set (dQ'_pset := filter_dup (concat (map (fun '(_, d) => d.(pset)) lQ'))).
-      set (dQ'_prob := fun Qa => sum (map (fun '(r0, d0) => (r0 * d0.(prob) Qa)%R) lQ')).
-      set (dQ' := {| ProbDistr.pset := dQ'_pset; ProbDistr.prob := dQ'_prob; |}).
-      assert (ProbDistr.sum_distr lQ' dQ') as H_sum_dQ'. {
-        split; auto.
-      }
-      specialize (IH a dQ' Q lQ' H7 H_sum_dQ').
-      apply IH.
-      simpl.
-      unfold dQ'_prob.
-      specialize (Hprob (Q a)).
-      destruct (eq_dec (Q a1) (Q a)) as [Heq | Hneq].
-      * 
-      * assert (forall b : Prop, Q a1 <> b -> d.(prob) b = 0%R) by apply H5.
-        specialize (H0 (Q a) Hneq).
-        assert (dQ.(prob) (Q a) = sum (map (fun '(r, d) => r * d.(prob) (Q a)) lQ')%R). {
-          rewrite H0 in Hprob.
-          lra.
-        }
-        lra.
-Admitted. *)
 
 Lemma sum_map_split_two_lists:
   forall {A: Type} (l: list A) (f: A -> R) (l1 l2: list A),
@@ -4196,6 +5044,13 @@ Proof.
       assumption.
     }
     pose proof nonneg_sublist_sum_le dQ.(pset) dQ.(prob) 1%R ltrueQ HnonnegQ HsumQset1 H0.
+    assert (NoDup ltrueQ) as HnodupQ by (destruct HsumQ; auto).
+    assert (NoDup dQ.(pset)) as HnodupQ'. {
+      destruct H_sum_distr as [Hperm_filterdup _].
+      rewrite Hperm_filterdup.
+      apply filter_dup_nodup.
+    }
+    specialize (H1 HnodupQ HnodupQ').
     assumption.
   }
   assert ((sum (map dQ.(prob) ltrueQ) >= 1)%R). {
@@ -4207,6 +5062,20 @@ Proof.
       assumption.
     }
     pose proof nonneg_sublist_sum_ge ltrueQ dQ.(prob) 1%R lQpos H1 HsumposQ H_inclQ.
+    assert (NoDup lQpos) as HnodupQpos. {
+      destruct H_sum_distr as [Hperm_filterdup _].
+      assert (NoDup dQ.(pset)) as HnodupQ'. {
+        rewrite Hperm_filterdup.
+        apply filter_dup_nodup.
+      }
+      pose proof Permutation_NoDup HpermQ HnodupQ' as HnodupQ.
+      eapply nodup_app_r; eauto.
+    }
+    assert (NoDup ltrueQ) as HnoduptrueQ. {
+      destruct HsumQ.
+      assumption.
+    }
+    specialize (H3 HnodupQpos HnoduptrueQ).
     assumption.
   }
   destruct HsumQ as [HsumQ' _].
@@ -4214,14 +5083,6 @@ Proof.
   rewrite <- HsumQ'.
   lra.
 Qed.
-
-Theorem Always_bind_ret {A B: Type}:
-  forall (c2: A -> ProbMonad.M B)
-         (f: A -> B)
-         (P: B -> Prop),
-    (forall a, c2 a = ret (f a)) ->
-    (forall c1, Always c1 (fun a => P (f a)) <-> Always (a <- c1;; c2 a) P).
-Admitted. (** Level 1 *)
 
 Theorem compute_pr_exists: forall f, exists r, ProbMonad.compute_pr f r.
 Proof.
@@ -4233,9 +5094,10 @@ Proof.
   tauto.
 Qed.
 
+(** Level 2 *)
 #[export] Instance ProbMonad_imply_event_refl:
   Reflexive ProbMonad.imply_event.
-Proof. (** Level 2 *)
+Proof.
   unfold Reflexive.
   unfold ProbMonad.imply_event.
   intros.
@@ -4248,9 +5110,10 @@ Proof. (** Level 2 *)
   apply ProbDistr_imply_event_refl.
 Qed.
   
+(** Level 2 *)
 Theorem ProbMonad_imply_event_refl_setoid:
   forall d1 d2, ProbMonad.equiv_event d1 d2 -> ProbMonad.imply_event d1 d2.
-Proof. (** Level 2 *)
+Proof.
   intros.
   unfold ProbMonad.equiv_event, ProbMonad.imply_event in *.
   destruct H as [r1 [r2 [? [? ?]]]].
@@ -4322,10 +5185,11 @@ Proof.
   apply Permutation_map'.
   assumption.
 Qed.
-  
+
+(** Level 2 *)
 #[export] Instance ProbMonad_imply_event_trans:
   Transitive ProbMonad.imply_event.
-Proof. (** Level 2 *)
+Proof.
   unfold Transitive, ProbMonad.imply_event.
   intros x y z.
   intros [dx [dy [Hx [Hy H_imp_xy]]]] [dy' [dz [Hy' [Hz H_imp_yz]]]].
@@ -4343,10 +5207,10 @@ Proof. (** Level 2 *)
   assumption.
 Qed.
   
-
+(** Level 2 *)
 #[export] Instance ProbMonad_equiv_event_equiv:
   Equivalence ProbMonad.equiv_event.
-Proof. (** Level 2 *)
+Proof.
   unfold ProbMonad.equiv_event.
   split.
   - unfold Reflexive.
@@ -4380,10 +5244,11 @@ Proof. (** Level 2 *)
     transitivity d2'; auto.
 Qed.
 
+(** Level 2 *)
 #[export] Instance ProbMonad_imply_event_congr:
   Proper (ProbMonad.equiv_event ==>
           ProbMonad.equiv_event ==> iff) ProbMonad.imply_event.
-Proof. (** Level 2 *)
+Proof.
   unfold Proper, respectful.
   intros x y H x0 y0 H0.
   split; intros.
@@ -4399,9 +5264,10 @@ Proof. (** Level 2 *)
     transitivity y0; auto.
 Qed.  
 
+(** Level 2 *)
 #[export] Instance compute_pr_congr:
   Proper (ProbMonad.equiv_event ==> Sets.equiv) ProbMonad.compute_pr.
-Proof. (** Level 2 *)
+Proof.
   unfold Proper, respectful.
   intros x y H.
   destruct H as [d1 [d2 [H1 [H2 Heq]]]].
@@ -4470,12 +5336,13 @@ Proof.
   assumption.
 Qed.
 
+(** Level 2 *)
 #[export] Instance ProbMonad_bind_congr (A B: Type):
   Proper (ProbMonad.equiv ==>
           pointwise_relation _ ProbMonad.equiv ==>
           ProbMonad.equiv)
     (@bind _ ProbMonad A B).
-Proof. (** Level 2 *)    
+Proof.  
   unfold Proper, pointwise_relation, respectful.
   unfold ProbMonad.equiv in *.
   sets_unfold.
@@ -4578,22 +5445,93 @@ Proof.
       * constructor; auto.
       * constructor; auto.
 Qed.
-    
+
+
+(* list_r list_d dA f Hlena Hlist_r Hlist_d. 
+  assert (length dA.(pset) = length list_r) as Hlen. {
+    rewrite Hlist_r.
+    symmetry.
+    apply map_length.
+  }
+
+  pose proof F2_sl Hlist_d as Hlen2.
+*)
+Lemma combine_rd_induction:
+  forall {A: Type} (n: nat) (list_r: list R) (list_d: list (Distr Prop)) (dA: Distr A) (f: A -> ProbMonad.M Prop),
+    length dA.(pset) <= n ->
+    list_r = map dA.(prob) dA.(pset) ->
+    Forall2 (fun (a : A) (d : Distr Prop) => (f a).(distr) d) dA.(pset) list_d -> 
+    Forall2 (fun (a : A) '(r, d) => r = dA.(prob) a /\ (f a).(distr) d) dA.(pset) (combine list_r list_d).
+Proof.
+  intros A n.
+  induction n.
+  {
+    intros list_r list_d dA f Hlena Hlist_r Hlist_d. 
+    assert (length dA.(pset) = length list_r) as Hlen. {
+      rewrite Hlist_r.
+      symmetry.
+      apply map_length.
+    }
+    pose proof F2_sl Hlist_d as Hlen2.
+    assert (length dA.(pset) = 0) by lia.
+    assert (length list_r = 0) by lia.
+    assert (length list_d = 0) by lia.
+    assert (dA.(pset) = []) by (apply length_zero_iff_nil; auto).
+    assert (list_r = []) by (apply length_zero_iff_nil; auto).
+    assert (list_d = []) by (apply length_zero_iff_nil; auto).
+    rewrite H2, H3, H4.
+    simpl; constructor.
+  }
+  {
+    intros list_r list_d dA f Hlena Hlist_r Hlist_d. 
+    assert (length dA.(pset) = length list_r) as Hlen. {
+      rewrite Hlist_r.
+      symmetry.
+      apply map_length.
+    }
+  
+    pose proof F2_sl Hlist_d as Hlen2.
+    destruct (classic (length dA.(pset) = S n)) as [Hlen' | Hlen'].
+    - assert (length list_r = S n) as Hir by lia.
+      assert (length list_d = S n) as Hid by lia.
+      destruct dA.(pset) as [|a dapset']; [inversion Hlen' |].
+      destruct list_r as [|r list_r']; [inversion Hir |].
+      destruct list_d as [|d list_d']; [inversion Hid |].
+      inversion Hlen'.
+      pose proof Forall2_inv Hlist_d as [Hi1 Hi2].
+      simpl in Hlist_r.
+      inversion Hlist_r.
+      simpl.
+      constructor.
+      + split; auto.
+      + specialize (IHn list_r' list_d').
+        specialize (IHn {|
+          ProbDistr.pset := dapset';
+          ProbDistr.prob := dA.(prob);
+        |}).
+        simpl in IHn.
+        specialize (IHn f).
+        assert (length dapset' <= n) as Hlenapset'. {
+          lia.
+        }
+        specialize (IHn Hlenapset' H2 Hi2).
+        subst.
+        apply IHn.
+
+    - assert (length dA.(pset) <= n) as Hlenapset by lia.
+      apply IHn; auto.
+  }
+Qed.
+
 Lemma combine_rd:
   forall {A: Type} (list_r: list R) (list_d: list (Distr Prop)) (dA: Distr A) (f: A -> ProbMonad.M Prop),
     list_r = map dA.(prob) dA.(pset) ->
     Forall2 (fun (a : A) (d : Distr Prop) => (f a).(distr) d) dA.(pset) list_d -> 
     Forall2 (fun (a : A) '(r, d) => r = dA.(prob) a /\ (f a).(distr) d) dA.(pset) (combine list_r list_d).
 Proof.
-  intros.
-  induction H0.
-  - assert (list_r = nil) as Hnil. {
-      auto.
-    }
-    subst.
-    constructor.
-  - simpl in H.
-Admitted.
+  intros A list_r list_d dA f Hlist_r Hlist_d.
+  apply combine_rd_induction with (n := length dA.(pset)); auto.
+Qed.
 
 Lemma exists_lx_ly:
   forall {A: Type} (dA: Distr A) (f : A -> ProbMonad.M Prop) (g : A -> ProbMonad.M Prop),
@@ -4752,18 +5690,94 @@ Proof.
       apply IHHFg. exact H4.
 Qed.
 
+Lemma bind_equiv_l_congr_1:
+  forall {A B: Type} (f1 f2: ProbMonad.M A) (g: A -> ProbMonad.M B),
+    ProbMonad.equiv f1 f2 ->
+    forall d, d ∈ (ProbMonad.bind f1 g).(distr) ->
+              d ∈ (ProbMonad.bind f2 g).(distr).
+Proof.
+  intros A B f1 f2 g H_equiv d.
+  sets_unfold.
+  unfold ProbMonad.equiv in H_equiv.
+  intros Hd.
+  unfold ProbMonad.bind in *; simpl in *.
+  unfold ProbMonad.__bind in *.
+  destruct Hd as [da [lab [Hda [Hlab H_sum_lab]]]].
+  exists da, lab.
+  split; auto.
+  eapply f2.(legal).(Legal_congr).
+  reflexivity.
+  apply H_equiv.
+  exact Hda.
+Qed.
+
+Lemma bind_equiv_l_congr:
+  forall {A B: Type} (f1 f2: ProbMonad.M A) (g: A -> ProbMonad.M B),
+    ProbMonad.equiv f1 f2 ->
+    ProbMonad.equiv (ProbMonad.bind f1 g) (ProbMonad.bind f2 g).
+Proof.
+  intros A B f1 f2 g H_equiv.
+  unfold ProbMonad.equiv in *.
+  sets_unfold.
+  intros.
+  split.
+  - apply bind_equiv_l_congr_1; auto.
+  - apply bind_equiv_l_congr_1; auto.
+    symmetry; auto.
+Qed.
+
+Lemma ProbDistr_from_bind:
+  forall {A B: Type} {f: ProbMonad.M A} {g: A -> ProbMonad.M B}
+    {da: Distr A} {lab: list (R * Distr B)} (d: Distr B),
+    da ∈ f.(distr) ->
+    Forall2 (fun a '(r, d) => r = da.(prob) a /\ d ∈ (g a).(distr)) da.(pset) lab ->
+    ProbDistr.sum_distr lab d ->
+    d ∈ (ProbMonad.bind f g).(distr).
+Proof.
+  intros A B f g da lab d.
+  intros Hda Hlab H_sum_lab.
+  sets_unfold.
+  unfold ProbMonad.bind.
+  unfold ProbMonad.__bind.
+  simpl.
+  exists da, lab.
+  split; auto.
+Qed.
+
 Lemma bind_congruence_step:
-  forall (A: Type) (dx dy: Distr A) (g: A -> ProbMonad.M Prop) 
+  forall (A: Type) (mx my: ProbMonad.M A) (dx dy: Distr A) (g: A -> ProbMonad.M Prop) 
          (lx ly: list (R * Distr Prop)) (dsx dsy: Distr Prop),
-    ProbDistr.equiv dx dy ->
+    ProbMonad.equiv mx my ->
+    dx ∈ mx.(distr) ->
+    dy ∈ my.(distr) ->
     Forall2 (fun a '(r, d) => r = dx.(prob) a /\ d ∈ (g a).(distr)) dx.(pset) lx ->
     Forall2 (fun a '(r, d) => r = dy.(prob) a /\ d ∈ (g a).(distr)) dy.(pset) ly ->
     ProbDistr.sum_distr lx dsx ->
     ProbDistr.sum_distr ly dsy ->
     ProbDistr.equiv dsx dsy.
 Proof.
-Admitted.
+  intros A mx my dx dy g lx ly dsx dsy.
+  intros H_equiv dx_in_mx dy_in_my Hlx Hly.
+  intros H_sum_lx H_sum_ly.
+  assert (dsx ∈ (ProbMonad.bind mx g).(distr)) as Hdx. {
+    eapply ProbDistr_from_bind; eauto.
+  }
+  assert (dsy ∈ (ProbMonad.bind my g).(distr)) as Hdy. {
+    eapply ProbDistr_from_bind; eauto.
+  }
+  assert (ProbMonad.equiv (ProbMonad.bind mx g) (ProbMonad.bind my g)) as H_bind_equiv. {
+    apply bind_equiv_l_congr.
+    exact H_equiv.
+  }
+  unfold ProbMonad.equiv in H_bind_equiv.
+  assert (dsx ∈ (ProbMonad.bind my g).(distr)) as Hdx'. {
+    eapply H_bind_equiv; eauto.
+  }
+  eapply (ProbMonad.bind my g).(legal).(Legal_unique); eauto.
+Qed.
 
+
+(** Level 2 *)
 #[export] Instance ProbMonad_bind_mono_event (A: Type):
 Proper
   (ProbMonad.equiv ==>
@@ -4862,12 +5876,7 @@ Proof.
       ++ exact H_d1.
       ++ exact H_d2.
     - (* show that d2x and d3x are equivalent, using dist1/dist2 equivalence *)
-      eapply (bind_congruence_step A dist1 dist2 fM2 list2 list3 d2x d3x).
-      + exact eqDist12.
-      + exact H_list2.
-      + exact H_list3.
-      + exact H_d2.
-      + exact H_d3.
+      eapply (bind_congruence_step _ dM1 dM2 dist1 dist2 fM2 list2 list3 d2x d3x); eauto.
   }
 
   (* Finally, produce the distributions needed for the main imply_event goal *)
@@ -4909,12 +5918,13 @@ Proof.
   repeat split; auto.
 Qed.
 
+(** Level 2 *)
 #[export] Instance ProbMonad_bind_congr_event (A: Type):
   Proper (ProbMonad.equiv ==>
           pointwise_relation _ ProbMonad.equiv_event ==>
           ProbMonad.equiv_event)
     (@bind _ ProbMonad A Prop).
-Proof. (** Level 2 *)
+Proof.
   unfold Proper, pointwise_relation, respectful.
   unfold ProbMonad.equiv, ProbMonad.equiv_event in *.
   sets_unfold.
@@ -5078,9 +6088,10 @@ Proof.
       reflexivity.
 Qed.
 
+(** Level 2 *)
 #[export] Instance ProbMonad_ret_mono_event:
   Proper (Basics.impl ==> ProbMonad.imply_event) ret.
-Proof. (** Level 2 *)
+Proof.
   unfold Proper, Basics.impl, ProbMonad.imply_event.
   intros P Q H.
   simpl.
@@ -5266,9 +6277,10 @@ Proof.
   assumption.
 Qed.
 
+(** Level 2 *)
 #[export] Instance ProbMonad_ret_congr_event:
   Proper (iff ==> ProbMonad.equiv_event) ret.
-Proof. (** Level 2 *)
+Proof.
   unfold Proper, respectful.
   intros P Q H.
   destruct H as [Hpq Hqp].
@@ -5279,180 +6291,6 @@ Proof. (** Level 2 *)
   apply ProbMonad_imply_event_equiv_event; auto.
 Qed.
 
-Lemma Forall2_imply:
-  forall {A B: Type} (l1: list A) (l2: list B) (P Q: A -> B -> Prop) ,
-    Forall2 P l1 l2 ->
-    (forall a b, 
-      In a l1 -> In b l2 -> P a b -> Q a b) ->
-    Forall2 Q l1 l2.
-Proof.
-  intros A B l1 l2  P Q H_forall2 H_imp.
-  induction H_forall2.
-  - constructor.
-  - constructor.
-    + apply H_imp.
-      all: simpl; auto.
-    + apply IHH_forall2.
-      intros.
-      apply H_imp.
-      all: simpl; auto.
-Qed.
-
-
-Lemma map_map_eq_Forall2:
-  forall {A B C: Type} (l1: list A) (l2: list B) (f: A -> C) (g: B -> C),
-    Forall2 (fun a b => f a = g b) l1 l2 ->
-    map f l1 = map g l2.
-Proof.
-  intros A B C l1 l2 f g H_forall2.
-  induction H_forall2.
-  - reflexivity.
-  - simpl.
-    rewrite IHH_forall2.
-    rewrite H.
-    reflexivity.
-Qed.
-
-Lemma In_combine_Forall2:
-  forall {A B: Type} (l1: list A) (l2: list B) (a: A) (b: B) (f: A -> B -> Prop),
-    In (a, b) (combine l1 l2) ->
-    Forall2 f l1 l2 ->
-    f a b.
-Proof.
-  intros.
-  pose proof Forall2_to_forall _ _ _ H0.
-  Search Forall.
-  rewrite Forall_forall in H1.
-  specialize (H1 (a, b) H).
-  simpl in *.
-  tauto.
-Qed.
-
-Lemma combine_exists:
-  forall {A B: Type} (l: list (A * B)),
-  exists l1 l2,
-    l = combine l1 l2.
-Proof.
-  intros A B l.
-  induction l as [| [a b] l IH].
-  - exists [], [].
-    reflexivity.
-  - destruct IH as [l1 [l2 IH]].
-    exists (a :: l1), (b :: l2).
-    simpl.
-    rewrite IH.
-    reflexivity.
-Qed.
-
-Lemma combine_permutation_l_exists_holds:
-  forall {A B: Type} (l1: list A) (l2: list B)
-    (l1': list A) pred,
-    Forall2 pred l1 l2 ->
-    Permutation l1 l1' ->
-    exists l2',
-      Permutation l2 l2' /\
-      Permutation (combine l1 l2) (combine l1' l2') /\
-      (* Forall2 still holds *)
-      Forall2 pred l1' l2'.
-Proof.
-Admitted.
-
-Lemma combine_Forall2:
-  forall {A B C: Type} (l1: list A) (l2: list B) (l3: list C) (f: A -> B -> C -> Prop),
-    length l1 = length l2 ->
-    length l1 = length l3 ->
-    (forall a b c,
-      In (a, b) (combine l1 l2) ->
-      In (a, c) (combine l1 l3) ->
-      f a b c ) ->
-    Forall2 (fun '(a, b) '(a', c) => a=a' /\ f a b c) (combine l1 l2) (combine l1 l3).
-Proof.
-Admitted.
-      
-
-Lemma Permutation_filter_dup_concat_incl:
-  forall {A: Type} (l1: list A) (l2: list (list A)),
-    Permutation l1 (filter_dup (concat l2)) ->
-    (
-      forall l, In l l2 -> incl l l1
-    ).
-Proof.
-Admitted.
-
-Lemma Forall2_app_l_break_r:
-  forall {A B: Type} (l1a l1b: list A) (l2: list B) (f: A -> B -> Prop),
-    Forall2 f (l1a ++ l1b) l2 ->
-    exists l2a l2b,
-      l2 = (l2a ++ l2b) /\
-      Forall2 f l1a l2a /\
-      Forall2 f l1b l2b.
-Proof.
-  intros.
-  revert l2 H.
-  induction l1a as [|a l1a' IH].
-  - exists [], l2.
-    simpl in H.
-    split; auto.
-  - intros.
-    destruct l2 as [|b l2'].
-    + simpl in H.
-      inversion H.
-    + simpl in H.
-      inversion H.
-      apply IH in H5.
-      destruct H5 as [l2a [l2b [Hl2 [Hl2a Hl2b]]]].
-      exists (b :: l2a), l2b.
-      split; auto.
-      rewrite Hl2.
-      simpl.
-      reflexivity.
-Qed. 
-
-Lemma list_pair_partition_l:
-  forall {A B: Type} (l1: list A) (l2: list B) (l1flag: list A),
-  forall pred, Forall2 pred l1 l2 -> 
-    exists l1t l1o l2t l2o,
-      (* the two parts hold the Forall2 *)
-      Forall2 pred l1t l2t /\
-      Forall2 pred l1o l2o /\
-      (* pairs are moved together *)
-      Permutation (combine l1 l2) ((combine l1t l2t) ++ (combine l1o l2o)) /\
-      (* partition is make with respect to l1flag *)
-      (forall a, In a l1t -> In a l1flag) /\
-      (forall a, In a l1o -> ~ In a l1flag).
-Proof.
-Admitted.
-
-(* Lemma NoDup_cons_in_dec:
-  forall {A: Type} (a: A) (l1 l2: list A),
-    NoDup (l1 ++ l2) ->
-    In a (l1 ++ l2) ->
-    {In a l1} + {In a l2}.
-Proof.
-Admitted. *)
-
-Lemma Permutation_combine_cons:
-  forall {A B: Type} {la: list A} {lb: list B} {la1 lb1 la2 lb2},
-    length la = length lb ->
-    length la1 = length lb1 ->
-    length la2 = length lb2 ->
-    Permutation (combine la lb) ((combine la1 lb1) ++ (combine la2 lb2)) ->
-    Permutation la (la1 ++ la2) /\
-    Permutation lb (lb1 ++ lb2).
-Proof.
-Admitted.
-
-Lemma combine_perm_l_exists:
-  forall {A B: Type} (l1: list A) (l2: list B) (l1': list A),
-  forall pred, 
-    Forall2 pred l1 l2 ->
-    Permutation l1 l1' ->
-    exists l2',
-      length l2 = length l2' /\
-      Permutation (combine l1 l2) (combine l1' l2') /\
-      Forall2 pred l1' l2'.
-Proof.
-Admitted.
 
 Lemma list_pair_partition_l_nodup_incl:
   forall {A B: Type} (l1: list A) (l2: list B) (l1flag: list A),
@@ -5513,7 +6351,7 @@ Qed.
 
       
 
-
+(** Level 3 *)
 Lemma bind_assoc:
   forall (A B C: Type)
          (f: ProbMonad.M A)
@@ -6817,8 +7655,9 @@ Proof.
       reflexivity.
     }
   }
-Qed. (** Level 3 *)
+Qed.
 
+(** Level 3 *)
 Lemma bind_assoc_event:
   forall (A B: Type)
          (f: ProbMonad.M A)
@@ -6888,6 +7727,7 @@ Proof.
     lra.
 Qed.
 
+(** Level 3 *)
 Lemma bind_ret_l:
   forall (A B: Type)
          (a: A)
@@ -6969,6 +7809,7 @@ Proof.
   }
 Qed.
 
+(** Level 3 *)
 Lemma bind_ret_l_event:
   forall (A: Type)
          (a: A)
@@ -7020,19 +7861,6 @@ Proof.
     reflexivity.
 Qed.
 
-Lemma Forall2_inv:
-  forall {A B: Type}
-         {pred: A -> B -> Prop}
-         {la: list A} {lb: list B}
-         {a: A} {b: B},
-    Forall2 pred (a :: la) (b :: lb) ->
-    pred a b /\ Forall2 pred la lb.
-Proof.
-  intros.
-  inversion H.
-  split; auto.
-Qed.
-
 
 Lemma concat_map_singleton:
   forall {A: Type}
@@ -7047,6 +7875,7 @@ Proof.
     reflexivity.
 Qed.
 
+(** Level 3 *)
 Lemma bind_ret_r:
   forall (A: Type)
          (f: ProbMonad.M A),
@@ -7266,3 +8095,228 @@ Proof.
   }
 Qed.
 
+Lemma bind_equiv_func_r_congr_1:
+  forall (A B: Type)
+         (f: ProbMonad.M A)
+         (g1 g2: A -> ProbMonad.M B),
+    (forall a, g1 a == g2 a) ->
+    forall d,
+    d ∈ (bind f g1).(distr) ->
+    d ∈ (bind f g2).(distr).
+Proof.
+  intros.
+  unfold bind in *.
+  simpl in *.
+  unfold ProbMonad.__bind in *.
+  destruct H0 as [da [lab [Hda [Hlab H_sum_lab_db]]]].
+  sets_unfold.
+  exists da, lab.
+  split; auto.
+  split; auto.
+  eapply Forall2_imply.
+  apply Hlab.
+  intros.
+  destruct b.
+  split.
+  - tauto.
+  - destruct H2.
+    assert (g1 a == g2 a) as H_g1_g2 by apply H.
+    unfold ProbMonad.equiv in H_g1_g2.
+    sets_unfold in H_g1_g2.
+    apply H_g1_g2.
+    assumption.
+Qed.
+
+Lemma bind_equiv_func_r_congr:
+  forall (A B: Type)
+         (f: ProbMonad.M A)
+         (g1 g2: A -> ProbMonad.M B),
+    (forall a, g1 a == g2 a) ->
+    bind f g1 == bind f g2.
+Proof.
+  intros.
+  unfold ProbMonad.equiv; sets_unfold.
+  intros d.
+  split.
+  - apply bind_equiv_func_r_congr_1; auto.
+  - apply bind_equiv_func_r_congr_1; auto.
+    symmetry; auto.
+Qed.
+
+
+
+(** Level 1 *)
+Theorem Always_bind_ret {A B: Type}:
+  forall (c2: A -> ProbMonad.M B)
+         (f: A -> B)
+         (P: B -> Prop),
+    (forall a, c2 a = ret (f a)) ->
+    (forall c1, Always c1 (fun a => P (f a)) <-> Always (a <- c1;; c2 a) P).
+Proof.
+  intros c2 f P Hc2 c1.
+  unfold Always.
+  unfold Hoare.
+  sets_unfold.
+  split.
+  {
+    intros H a.
+    specialize (H a).
+    unfold ProbMonad.compute_pr in *.
+    intros [d Hd].
+    sets_unfold in Hd.
+    destruct Hd as [Hd1 Hd2].
+    apply H; clear H.
+    exists d.
+    split; auto.
+    clear Hd2.
+    sets_unfold.
+    assert (c2 = fun a => ret (f a)) as Hc2'. {
+      apply functional_extensionality.
+      intros.
+      apply Hc2.
+    }
+    subst c2; clear Hc2.
+    remember (ProbMonad.bind (ProbMonad.bind c1 (fun a : A => ProbMonad.ret (f a))) (fun res : B => ProbMonad.ret (P res))) as bind1.
+    remember (ProbMonad.bind c1 (fun res: A => ProbMonad.ret (P (f res)))) as bind2.
+    assert (d ∈ bind1.(distr)) as Hdin1.
+    {
+      subst bind1.
+      subst bind2.
+      sets_unfold.
+      unfold bind, ret in *; simpl in *.
+      unfold ProbMonad.__bind, ProbMonad.__ret in *; simpl in *.
+      exact Hd1.
+    }
+    clear Hd1.
+    enough (d ∈ bind2.(distr)) as Hdin2.
+    {
+      subst bind2.
+      sets_unfold.
+      unfold bind, ret in *; simpl in *.
+      unfold ProbMonad.__bind, ProbMonad.__ret in *; simpl in *.
+      exact Hdin2.
+    }
+    remember (ProbMonad.bind c1 (fun a: A => ProbMonad.bind (ProbMonad.ret (f a)) (fun res: B => ProbMonad.ret (P res))))
+     as bind1'.
+    assert (bind1 == bind1') as Hbind1eqbind1'.
+    {
+      subst bind1'.
+      subst bind1.
+      eapply bind_assoc.
+    }
+    assert (d ∈ bind1'.(distr)) as Hdin1'.
+    {
+      unfold ProbMonad.equiv in Hbind1eqbind1'.
+      rewrite <- Hbind1eqbind1'.
+      exact Hdin1.
+    }
+    clear bind1 Heqbind1 Hdin1 Hbind1eqbind1'.
+    remember (fun res : A => ProbMonad.ret (P (f res))) as func2.
+    remember (fun a : A =>
+    ProbMonad.bind (ProbMonad.ret (f a))
+      (fun res : B => ProbMonad.ret (P res))) as func1'.
+    assert (forall a, func1' a == func2 a) as Hfunc1eqfunc2.
+    {
+      clear a.
+      intros.
+      subst.
+      remember (ProbMonad.bind (ProbMonad.ret (f a))
+      (fun res : B => ProbMonad.ret (P res))) as lhs.
+      pose proof bind_ret_l _ _ (f a) (fun res : B => ProbMonad.ret (P res)).
+      unfold bind, ret in H; simpl in H.
+      rewrite <- Heqlhs in H.
+      assumption.
+    }
+    assert (bind1' == bind2). {
+      subst.
+      eapply bind_equiv_func_r_congr.
+      apply Hfunc1eqfunc2.
+    }
+    sets_unfold.
+    unfold ProbMonad.equiv in H.
+    sets_unfold in H.
+    rewrite <- H.
+    exact Hdin1'.
+  }
+  {
+    intros H a.
+    specialize (H a).
+    unfold ProbMonad.compute_pr in *.
+    intros [d Hd].
+    sets_unfold in Hd.
+    destruct Hd as [Hd1 Hd2].
+    apply H; clear H.
+    exists d.
+    split; auto.
+    clear Hd2.
+    sets_unfold.
+    assert (c2 = fun a => ret (f a)) as Hc2'. {
+      apply functional_extensionality.
+      intros.
+      apply Hc2.
+    }
+    subst c2; clear Hc2.
+    remember (ProbMonad.bind (ProbMonad.bind c1 (fun a : A => ProbMonad.ret (f a))) (fun res : B => ProbMonad.ret (P res))) as bind1.
+    remember (ProbMonad.bind c1 (fun res: A => ProbMonad.ret (P (f res)))) as bind2.
+    assert (d ∈ bind2.(distr)) as Hdin1.
+    {
+      subst bind1.
+      subst bind2.
+      sets_unfold.
+      unfold bind, ret in *; simpl in *.
+      unfold ProbMonad.__bind, ProbMonad.__ret in *; simpl in *.
+      exact Hd1.
+    }
+    clear Hd1.
+    enough (d ∈ bind1.(distr)) as Hdin2.
+    {
+      subst.
+      sets_unfold.
+      unfold bind, ret in *; simpl in *.
+      unfold ProbMonad.__bind, ProbMonad.__ret in *; simpl in *.
+      exact Hdin2.
+    }
+    remember (ProbMonad.bind c1 (fun a: A => ProbMonad.bind (ProbMonad.ret (f a)) (fun res: B => ProbMonad.ret (P res))))
+     as bind1'.
+    assert (bind1 == bind1') as Hbind1eqbind1'.
+    {
+      subst bind1'.
+      subst bind1.
+      eapply bind_assoc.
+    }
+    enough (d ∈ bind1'.(distr)) as Hdin1'.
+    {
+      unfold ProbMonad.equiv in Hbind1eqbind1'.
+      sets_unfold in Hbind1eqbind1'.
+      apply Hbind1eqbind1'.
+      exact Hdin1'.
+    }
+    clear bind1 Heqbind1 Hbind1eqbind1'.
+    remember (fun res : A => ProbMonad.ret (P (f res))) as func2.
+    remember (fun a : A =>
+    ProbMonad.bind (ProbMonad.ret (f a))
+      (fun res : B => ProbMonad.ret (P res))) as func1'.
+    assert (forall a, func1' a == func2 a) as Hfunc1eqfunc2.
+    {
+      clear a.
+      intros.
+      subst.
+      remember (ProbMonad.bind (ProbMonad.ret (f a))
+      (fun res : B => ProbMonad.ret (P res))) as lhs.
+      pose proof bind_ret_l _ _ (f a) (fun res : B => ProbMonad.ret (P res)).
+      unfold bind, ret in H; simpl in H.
+      rewrite <- Heqlhs in H.
+      assumption.
+    }
+    assert (bind1' == bind2). {
+      subst.
+      eapply bind_equiv_func_r_congr.
+      apply Hfunc1eqfunc2.
+    }
+    sets_unfold.
+    unfold ProbMonad.equiv in H.
+    sets_unfold in H.
+    apply H.
+    exact Hdin1.
+  }
+Qed.
