@@ -1699,6 +1699,39 @@ Proof.
     + transitivity (combine l' l2i1); auto.
 Qed.
 
+Lemma list_partition_condition:
+  forall {A: Type} (l: list A) (f: A -> bool),
+    exists l1 l2,
+      Permutation (l1 ++ l2) l /\
+      (forall a, In a l1 -> f a = true) /\
+      (forall a, In a l2 -> f a = false).
+Proof.
+  intros.
+  exists (filter f l), (filter (fun a => negb (f a)) l).
+  split.
+  - induction l.
+    + simpl.
+      reflexivity.
+    + simpl.
+      destruct (f a).
+      * simpl.
+        rewrite IHl.
+        reflexivity.
+      * simpl.
+        rewrite Permutation_app_comm.
+        simpl.
+        apply Permutation_cons; [reflexivity | auto].
+        rewrite Permutation_app_comm.
+        apply IHl.
+  - split; intros.
+    + apply filter_In in H.
+      destruct H.
+      destruct (f a); auto.
+    + apply filter_In in H.
+      destruct H.
+      destruct (f a); auto.
+Qed.
+
 Lemma list_partition_in_notin:
   forall {A: Type} (l t: list A),
     exists t1 t2,
@@ -1706,36 +1739,36 @@ Lemma list_partition_in_notin:
       (forall a, In a t1 -> In a l) /\
       (forall a, In a t2 -> ~ In a l).
 Proof.
-  intros.
-  exists (filter (fun a => if in_dec eq_dec a l then true else false) t),
-         (filter (fun a => if in_dec eq_dec a l then false else true) t).
+  intros A l t.
+  remember (fun x => if in_dec eq_dec x l then true else false) as f.
+  pose proof list_partition_condition t f as [t1 [t2 [Hperm [Ht1 Ht2]]]].
+  exists t1, t2.
+  split; auto.
   split.
-  - induction t.
-    + simpl.
-      reflexivity.
-    + simpl.
+  - intros.
+    pose proof Ht1 a H.
+    destruct (in_dec eq_dec a l); auto.
+    exfalso.
+    assert (f a = false) as Hf. {
+      subst.
       destruct (in_dec eq_dec a l).
-      * simpl.
-        rewrite IHt.
-        reflexivity.
-      * simpl.
-        (* Search (Permutation (_ ++ _)). *)
-        rewrite Permutation_app_comm.
-        simpl.
-        apply Permutation_cons; [reflexivity | auto].
-        rewrite Permutation_app_comm.
-        apply IHt.
-  - split; intros.
-    + apply filter_In in H.
-      destruct H.
+      - contradiction.
+      - tauto.
+    }
+    rewrite Hf in H0.
+    discriminate.
+  - intros.
+    pose proof Ht2 a H.
+    destruct (in_dec eq_dec a l); auto.
+    exfalso.
+    assert (f a = true) as Hf. {
+      subst.
       destruct (in_dec eq_dec a l).
-      * auto.
-      * inversion H0.
-    + apply filter_In in H.
-      destruct H.
-      destruct (in_dec eq_dec a l).
-      * inversion H0.
-      * auto.
+      - tauto.
+      - contradiction.
+    }
+    rewrite Hf in H0.
+    discriminate.
 Qed.
 
 
