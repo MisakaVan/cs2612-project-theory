@@ -4259,14 +4259,15 @@ Qed.
 
 Lemma sumup_incl:
   forall {A: Type} (zero_list pos_list l: list A) (f: A -> R) (r: R),
+    NoDup l ->
     Permutation l (zero_list ++ pos_list) ->
     (forall a, In a zero_list -> f a = 0)%R ->
     (forall a, In a pos_list -> f a > 0)%R ->
     sum (map f pos_list) = r ->
     (r >= 0)%R ->
-    (forall subl, incl subl l -> (sum (map f subl) = r)%R -> incl pos_list subl).
+    (forall subl, NoDup subl -> incl subl l -> (sum (map f subl) = r)%R -> incl pos_list subl).
 Proof.
-  intros A zero_list pos_list l f r HP Hzero Hpos Hsumpos Hr subl Hsubl Hsumsubl.
+  intros A zero_list pos_list l f r Hnodupl HP Hzero Hpos Hsumpos Hr subl Hnodupsubl Hsubl Hsumsubl.
   unfold incl.
   intros a Ha.
   pose proof Hpos a Ha as Hfapos.
@@ -4324,6 +4325,10 @@ Proof.
     }
     pose proof incl_cons H2 Hsubl.
     specialize (Hsumge H3).
+    assert (NoDup (a :: subl)) as Hnodupasubl. {
+      constructor; auto.
+    }
+    specialize (Hsumge Hnodupasubl Hnodupl).
     lra.
 Qed.
     
@@ -4603,7 +4608,10 @@ Proof.
 
   assert (incl lPpos ltrueP) as H_inclP. {
     apply sumup_incl with (zero_list := lPzero) (pos_list := lPpos) (l := dP.(pset)) (f := dP.(prob)) (r := 1%R); auto.
+    + unfold ProbDistr.pset; simpl.
+      apply filter_dup_nodup.
     + lra.
+    + destruct HsumP; auto.
     + apply incl_Forall_in_iff.
       apply Forall_forall.
       intros.
