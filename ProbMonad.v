@@ -3276,8 +3276,6 @@ Proof.
   auto.
 Qed.
 
-Require Import Coq.Logic.IndefiniteDescription.
-
 Lemma exists_d_in_l:
   forall {A: Type} (dA: Distr A) (f: A -> ProbMonad.M Prop) (g: A -> ProbMonad.M Prop),
     (forall a, In a dA.(pset) -> (exists d1 d2 : Distr Prop,
