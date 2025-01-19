@@ -6203,6 +6203,7 @@ Qed.
 Lemma Forall2_imply_event_pairs :
   forall (X: Type) (distX: Distr X) (mapG mapH: X -> ProbMonad.M Prop)
          (pairsG pairsH: list (R * Distr Prop)),
+    ProbDistr.legal distX ->
     (forall x, ProbMonad.imply_event (mapG x) (mapH x)) ->
     Forall2
       (fun x '(rg, dg) => rg = distX.(prob) x /\ dg ∈ (mapG x).(distr))
@@ -6211,10 +6212,12 @@ Lemma Forall2_imply_event_pairs :
       (fun x '(rh, dh) => rh = distX.(prob) x /\ dh ∈ (mapH x).(distr))
       distX.(pset) pairsH ->
     Forall2
-      (fun '(rG, dG) '(rH, dH) => rG = rH /\ ProbDistr.imply_event dG dH)
+      (fun '(rG, dG) '(rH, dH) => rG = rH /\ (rG >= 0)%R /\ ProbDistr.imply_event dG dH 
+      /\ ProbDistr.legal dG /\ ProbDistr.legal dH
+      )
       pairsG pairsH.
 Proof.
-  intros X distX mapG mapH pairsG pairsH Hmono HFg HFh.
+  intros X distX mapG mapH pairsG pairsH legal_distX Hmono HFg HFh.
   (* We will proceed by induction on HFg, while simultaneously
      matching it with HFh via 'revert ...; induction ...'. *)
   revert pairsH HFh.
@@ -6229,9 +6232,14 @@ Proof.
       destruct y0 as [rH dH].
       destruct H  as [HG_eq  HG_in].
       destruct H2 as [HH_eq  HH_in].
-      split.
+      split; [|split].
+      3: split.
+      4: split.
       * (* Show rG = rH by combining HG_eq and HH_eq *)
         rewrite HG_eq, HH_eq. reflexivity.
+      * rewrite HG_eq.
+        destruct legal_distX.
+        apply legal_nonneg.
       * (* Show dG ==> dH using mapG x ==> mapH x and distribution uniqueness *)
         specialize (Hmono x).
         unfold ProbMonad.imply_event in Hmono.
@@ -6244,6 +6252,10 @@ Proof.
         apply ProbDistr_equiv_equiv_event in HeqH.
         apply ProbDistr_imply_event_congr with midG midH;
           [exact HeqG | exact HeqH | exact Himpl].
+      * (* Show dG and dH are legal distributions *)
+        exact ((mapG x).(legal).(Legal_legal) _ HG_in).
+      * exact ((mapH x).(legal).(Legal_legal) _ HH_in).
+
     + (* Inductive step on tails *)
       apply IHHFg. exact H4.
 Qed.
@@ -6427,10 +6439,8 @@ Proof.
     split.
     - (* show that d1x implies d2x by matching pairs from list1/list2 *)
       eapply list_forall_imply_event_with_sum_distributions with list1 list2.
-      ++ apply (Forall2_imply_event_pairs A dist1 fM1 fM2 list1 list2).
-         +++ exact H_imply.
-         +++ exact H_list1.
-         +++ exact H_list2.
+      ++ apply (Forall2_imply_event_pairs A dist1 fM1 fM2 list1 list2); eauto.
+         exact (dM1.(legal).(Legal_legal) _ in_dM1).
       ++ exact H_d1.
       ++ exact H_d2.
     - (* show that d2x and d3x are equivalent, using dist1/dist2 equivalence *)
