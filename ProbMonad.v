@@ -2104,6 +2104,52 @@ Qed.
 
 (** Other lemmas *)
 
+Lemma map_combine_l:
+  forall {A B C: Type} (f: A -> C) (l1: list A) (l2: list B),
+    length l1 = length l2 ->
+    map f l1 = map (fun '(a, _) => f a) (combine l1 l2).
+Proof.
+  intros.
+  revert l2 H.
+  induction l1 as [| a l1 IH].
+  - intros.
+    destruct l2 as [| b l2].
+    + reflexivity.
+    + inversion H.
+  - intros.
+    destruct l2 as [| b l2].
+    + inversion H.
+    + simpl.
+      f_equal.
+      apply IH.
+      simpl in H.
+      injection H as H.
+      auto.
+Qed.
+
+Lemma map_combine_r:
+  forall {A B C: Type} (f: B -> C) (l1: list A) (l2: list B),
+    length l1 = length l2 ->
+    map f l2 = map (fun '(_, b) => f b) (combine l1 l2).
+Proof.
+  intros.
+  revert l2 H.
+  induction l1 as [| a l1 IH].
+  - intros.
+    destruct l2 as [| b l2].
+    + reflexivity.
+    + inversion H.
+  - intros.
+    destruct l2 as [| b l2].
+    + inversion H.
+    + simpl.
+      f_equal.
+      apply IH.
+      simpl in H.
+      injection H as H.
+      auto.
+Qed.
+
 Lemma In_in_concat_map {A B: Type}:
   forall (l: list A) (f: A -> list B) (b: B),
     (exists a, In a l /\ In b (f a)) ->
@@ -5862,19 +5908,6 @@ Proof.
   apply sum_distr_exists.
 Qed.
 
-Lemma map_combine_l:
-  forall {A B C: Type} (f: A -> C) (l1: list A) (l2: list B),
-    length l1 = length l2 ->
-    map f l1 = map (fun '(a, _) => f a) (combine l1 l2).
-Proof.
-Admitted.
-
-Lemma map_combine_r:
-  forall {A B C: Type} (f: B -> C) (l1: list A) (l2: list B),
-    length l1 = length l2 ->
-    map f l2 = map (fun '(_, b) => f b) (combine l1 l2).
-Proof.
-Admitted.
 
 Lemma sum_map_le_in:
   forall {A: Type} (l: list A) (f1 f2: A -> R),
