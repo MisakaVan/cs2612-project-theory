@@ -987,6 +987,8 @@ Proof.
       right; auto.
 Qed.
 
+
+(* helper lemma that inductions on length of 3 lists *)
 Lemma Forall2_pair_Forall2_lt_length {A B1 B2: Type}:
   forall n,
   forall
@@ -1091,6 +1093,10 @@ Proof.
   auto.
 Qed.
 
+(* 
+  la and lb's properties are constrained and connected by the two Forall2
+    that share the common l.
+*)
 Lemma Forall2_pair_Forall2 {A B: Type}:
   forall (P: A -> B -> Prop) (Q: B -> B -> Prop) l la lb,
     Forall2 P l la ->
@@ -1126,7 +1132,9 @@ Proof.
     constructor; auto.
 Qed.
 
-
+(* 
+  P imply Q, then Forall2 P imply Forall2 Q.
+*)
 Lemma Forall2_imply:
   forall {A B: Type} (l1: list A) (l2: list B) (P Q: A -> B -> Prop) ,
     Forall2 P l1 l2 ->
@@ -1146,7 +1154,9 @@ Proof.
       all: simpl; auto.
 Qed.
 
-
+(* 
+  extract map-equality from Forall2.
+*)
 Lemma map_map_eq_Forall2:
   forall {A B C: Type} (l1: list A) (l2: list B) (f: A -> C) (g: B -> C),
     Forall2 (fun a b => f a = g b) l1 l2 ->
@@ -1219,6 +1229,11 @@ Proof.
         simpl; right; auto.
 Qed.
 
+
+(* 
+  Given the left list as two parts,
+  the right list can be divided into two parts accordingly.
+*)
 Lemma Forall2_app_l_break_r:
   forall {A B: Type} (l1a l1b: list A) (l2: list B) (f: A -> B -> Prop),
     Forall2 f (l1a ++ l1b) l2 ->
@@ -1366,7 +1381,9 @@ Proof.
   auto.
 Qed.
 
-
+(* 
+  a way to say `Forall3` in terms of `Forall2`.
+*)
 Lemma combine_Forall2:
   forall {A B C: Type} (l1: list A) (l2: list B) (l3: list C) (f: A -> B -> C -> Prop),
     length l1 = length l2 ->
@@ -1565,6 +1582,10 @@ Section list_partition_permutation.
   or permutation of a list with respect to another list.
 *)
 
+(* 
+  given two same-length lists, and how the first list is permuted,
+  we can permute the second list accordingly.
+*)
 Lemma Permutation_combine_wrt_left {A B: Type}:
   forall (l1: list A) (l2: list B) (l1': list A),
     length l1 = length l2 ->
@@ -1623,6 +1644,10 @@ Proof.
     + transitivity (combine l' l2i1); auto.
 Qed.
 
+
+(* 
+  partition a list into two lists based on a condition.
+*)
 Lemma list_partition_condition:
   forall {A: Type} (l: list A) (f: A -> bool),
     exists l1 l2,
@@ -1656,6 +1681,9 @@ Proof.
       destruct (f a); auto.
 Qed.
 
+(* 
+  the partition is made with respect to a reference list.
+*)
 Lemma list_partition_in_notin:
   forall {A: Type} (l t: list A),
     exists t1 t2,
@@ -1736,6 +1764,10 @@ Proof.
         contradiction.
 Qed.
 
+(* 
+  partition a pair of lists based by conditioning on the first list.
+  the two parts both still hold the Forall2 constraint.
+*)
 Lemma list_pair_partition_l:
   forall {A B: Type} (l1: list A) (l2: list B) (l1flag: list A),
   forall pred, Forall2 pred l1 l2 -> 
@@ -1913,6 +1945,10 @@ Proof.
       lia.
 Qed.
 
+(* 
+  given a Forall2, and a permutation of the left list,
+  we can permute the right list accordingly.
+*)
 Lemma Forall2_perm_l_exists:
   forall {A B: Type} (l1: list A) (l2: list B) (f: A -> B -> Prop) (l1': list A),
     Permutation l1 l1' ->
@@ -2413,6 +2449,10 @@ Proof.
     simpl. right. auto.
 Qed.
 
+(* 
+  Change the order of the sum.
+  \sum_x \sum_y f x y = \sum_y \sum_x f x y.
+*)
 Lemma sum_map_sum_map:
   forall (A B: Type) (la: list A) (lb: list B) (g: B -> A -> R),
     sum (
@@ -2554,7 +2594,10 @@ Proof.
   - assumption.
 Qed.
 
-
+(* 
+  For a list that maps to non-negative real numbers,
+  summing over part of it will not exceed the sum of the whole list.
+*)
 Lemma nonneg_sublist_sum_le:
   forall {A: Type} (l: list A) (f: A -> R) (r: R) (subl: list A),
     (forall a, In a l -> f a >= 0)%R ->
@@ -2605,6 +2648,10 @@ Proof.
   apply H4.
 Qed.
 
+(* 
+  For a list that maps to non-negative real numbers,
+  summing a supset of it will be no less than the sum of the smaller list.
+*)
 Lemma nonneg_sublist_sum_ge:
   forall {A: Type} (l: list A) (f: A -> R) (r: R) (subl: list A),
     (forall a, In a l -> f a >= 0)%R ->
@@ -2655,6 +2702,11 @@ Proof.
   apply H4.
 Qed.
 
+(**
+  A list can be partitioned into two parts. the zero-part map to 0, and the positive-part map to positive numbers.
+  if the sum of some part is equal to the sum of the whole list, then the positive-part is a subset of the part, that is,
+  positive-part ⊆ part ⊆ whole-list
+*)
 Lemma sumup_incl:
   forall {A: Type} (zero_list pos_list l: list A) (f: A -> R) (r: R),
     NoDup l ->
