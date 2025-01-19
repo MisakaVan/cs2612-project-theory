@@ -1,6 +1,7 @@
 CURRENT_DIR=.
 SETS_DIR = sets
 COMPCERT_DIR = compcert_lib
+LISTOP_DIR = ListOperation
 # PL_DIR = pl
 ASSIGNMENT_DIR = Assignment
 
@@ -17,32 +18,28 @@ SETS_FLAG = -R $(SETS_DIR) SetsClass
 
 COMPCERT_FLAG = -R $(COMPCERT_DIR) compcert.lib
 
-DEP_FLAG = -R $(SETS_DIR) SetsClass -R $(COMPCERT_DIR) compcert.lib
+LISTOP_FLAG = -R $(LISTOP_DIR) ListOperation
+
+DEP_FLAG = $(SETS_FLAG) $(COMPCERT_FLAG) $(LISTOP_FLAG)
+
 
 SETS_FILE_NAMES = \
    SetsClass.v SetsClass_AxiomFree.v SetsDomain.v SetElement.v SetElementProperties.v RelsDomain.v SetProd.v SetsDomain_Classic.v
-
-   
 SETS_FILES=$(SETS_FILE_NAMES:%.v=$(SETS_DIR)/%.v)
-   
+
 COMPCERT_FILE_NAMES = \
     Coqlib.v Integers.v Zbits.v
-    
 COMPCERT_FILES=$(COMPCERT_FILE_NAMES:%.v=$(COMPCERT_DIR)/%.v)
 
-PL_FILE_NAMES = \
-	Syntax.v SimpleProofsAndDefs.v InductiveType.v DenotationalBasic.v RecurProp.v BuiltInNat.v DenotationalRels.v Logic.v FixedPoint.v Monad.v \
-	List.v Monad2.v
-  
-# PL_FILES=$(PL_FILE_NAMES:%.v=$(PL_DIR)/%.v)
+LISTOP_FILE_NAMES = \
+	ListOperation.v
+LISTOP_FILES=$(LISTOP_FILE_NAMES:%.v=$(LISTOP_DIR)/%.v)
 
-# ASSIGNMENT_FILE_NAMES = \
-# 	Assignment1018b.v Assignment1023.v Assignment1030b.v Assignment1127a.v Assignment1127b.v
 
-# ASSIGNMENT_FILES=$(ASSIGNMENT_FILE_NAMES:%.v=$(ASSIGNMENT_DIR)/%.v)
 
 FILES = $(SETS_FILES) \
-  $(COMPCERT_FILES)
+  $(COMPCERT_FILES) \
+  $(LISTOP_FILES) \
 
 $(SETS_FILES:%.v=%.vo): %.vo: %.v
 	@echo COQC $<;
@@ -51,6 +48,10 @@ $(SETS_FILES:%.v=%.vo): %.vo: %.v
 $(COMPCERT_FILES:%.v=%.vo): %.vo: %.v
 	@echo COQC $<;
 	@$(COQC) $(COMPCERT_FLAG) $<
+
+$(LISTOP_FILES:%.v=%.vo): %.vo: %.v
+	@echo COQC $<;
+	@$(COQC) $(LISTOP_FLAG) $<
 
 all: $(FILES:%.v=%.vo)
 
