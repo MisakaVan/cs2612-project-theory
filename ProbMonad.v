@@ -3319,7 +3319,9 @@ Proof.
 Qed.
 
 (*
-TODO:
+  ds1 and ds2 are summed distributions of L1 and L2.
+  if L1 and L2 are pairwise imply_event-constrained, and the weight are pairwise equal,
+  then ds1 and ds2 are also imply_event-constrained.
 *)
 Lemma list_forall_imply_event_with_sum_distributions:
   forall (L1 L2 : list (R * Distr Prop)) (ds1 ds2 : Distr Prop),
@@ -3596,7 +3598,9 @@ Proof.
 Qed.
 
 (*
-TODO:
+  there are two mappings from X to M Prop, mapG and mapH.
+  For each x in X, mapG x implies mapH x.
+  pairsG and pairsH are weighted distributions collection of distX and mapG/mapH.
 *)
 Lemma Forall2_imply_event_pairs :
   forall (X: Type) (distX: Distr X) (mapG mapH: X -> ProbMonad.M Prop)
@@ -3701,7 +3705,9 @@ Proof.
 Qed.
 
 (*
-TODO:
+  the reverse of definition of bind operation.
+  if we can find a distribution d that looks like the result of binding f and g,
+  then it is indeed in the binding of f and g.
 *)
 Lemma ProbDistr_from_bind:
   forall {A B: Type} {f: ProbMonad.M A} {g: A -> ProbMonad.M B}
@@ -3722,7 +3728,8 @@ Proof.
 Qed.
 
 (*
-TODO:
+  if dx and dy are equivalent, and we bind them with the same function g,
+  the result distributions dsx and dsy are also equivalent.
 *)
 Lemma bind_congruence_step:
   forall (A: Type) (mx my: ProbMonad.M A) (dx dy: Distr A) (g: A -> ProbMonad.M Prop) 
@@ -5990,7 +5997,7 @@ Proof.
 Qed.
 
 (*
-TODO:
+  binding with equivalent functions is equivalent.
 *)
 Lemma bind_equiv_func_r_congr_1:
   forall (A B: Type)
@@ -6025,7 +6032,7 @@ Proof.
 Qed.
 
 (*
-TODO:
+  binding with equivalent functions is equivalent.
 *)
 Lemma bind_equiv_func_r_congr:
   forall (A B: Type)
