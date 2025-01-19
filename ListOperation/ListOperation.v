@@ -35,7 +35,11 @@ Qed.
 (**                                                      *)
 (*********************************************************)
 
-(** filter_dup  *)
+Section filter_dup.
+
+(** filter_dup 
+    remove duplicates from a list while preserving the In relation.
+*)
 
 (* use ListSet to define *)
 
@@ -304,6 +308,30 @@ Proof.
   rewrite filter_dup_cons.
   rewrite set_add_already_in; auto.
 Qed.
+
+Lemma not_in_filter_dup_remove:
+  forall {A: Type} (l1 l2: list A) (a: A),
+    ~ In a (filter_dup (l1 ++ l2)) -> ~ In a (filter_dup l2).
+Proof.
+  intros.
+  unfold not.
+  intros.
+  apply H.
+  clear H.
+  pose proof filter_dup_in _ _ H0.
+  apply filter_dup_in_inv.
+  apply in_or_app.
+  right.
+  auto.
+Qed.
+
+End filter_dup.
+
+Section Permutation_filter_dup.
+
+(* 
+  two lists being permutations of each other after removing duplicates.
+*)
 
 (** filter_dup and Permutation  *)
 
@@ -609,6 +637,9 @@ Proof.
     all: auto.
 Qed.
 
+End Permutation_filter_dup.
+
+Section NoDup.
 
 (** NoDup  *)
 
@@ -722,6 +753,13 @@ Proof.
   split; auto.
 Qed.
 
+End NoDup.
+
+Section Permutation_after_map.
+
+(* 
+  two lists being permutations of each other after applying a function.
+*)
 
 
 (** Permutation and map *)
@@ -775,9 +813,13 @@ Proof.
     all: symmetry; auto.
 Qed.
 
+End Permutation_after_map.
 
+Section Forall2.
 
-(** Forall2 *)
+(* 
+  properties of Forall2 in addition to those given in Coq standard library.
+*)
 
 Lemma Forall2_inv:
   forall {A B: Type}
@@ -1071,20 +1113,6 @@ Proof.
   all: auto.
 Qed.
 
-Lemma In_concat_map_exists {A B: Type}:
-  forall (l: list A) (f: A -> list B) (b: B),
-    In b (concat (map f l)) ->
-    exists a, In a l /\ In b (f a).
-Proof.
-  intros.
-  apply in_concat in H.
-  destruct H as [l' [? ?]].
-  apply in_map_iff in H.
-  destruct H as [a [? ?]].
-  subst.
-  exists a.
-  auto.
-Qed.
 
 Lemma Forall2_to_forall:
   forall {A B: Type} (l1: list A) (l2: list B) (f: A -> B -> Prop),
@@ -1096,64 +1124,6 @@ Proof.
   - constructor.
   - simpl.
     constructor; auto.
-Qed.
-
-Lemma in_exists_remaining_list_perm:
-  forall {A: Type} (l: list A) (a: A) ,
-    In a l -> exists l', Permutation l (a :: l').
-Proof.
-  induction l.
-  - contradiction.
-  - intros.
-    destruct H.
-    + subst.
-      exists l.
-      apply Permutation_refl.
-    + specialize (IHl a0 H).
-      destruct IHl as [l' H_perm].
-      exists (a :: l').
-      (* Search Permutation. *)
-      pose proof perm_swap a a0 l' as H_swap.
-      pose proof Permutation_trans.
-      specialize (H0 A (a :: l) (a :: a0 :: l') (a0 :: a :: l')).
-      apply H0.
-      * apply Permutation_cons; auto.
-      * apply Permutation_sym.
-        apply H_swap.
-Qed.
-
-Lemma in_map_eq:
-  forall {A B: Type} (f: A -> B) (g: A -> B) (l: list A),
-    (forall a, In a l -> f a = g a) -> 
-    map f l = map g l.
-Proof.
-  intros.
-  induction l.
-  - reflexivity.
-  - simpl.
-    f_equal.
-    + apply H.
-      simpl; auto.
-    + apply IHl.
-      intros.
-      apply H.
-      simpl; auto.
-Qed.
-
-Lemma not_in_filter_dup_remove:
-  forall {A: Type} (l1 l2: list A) (a: A),
-    ~ In a (filter_dup (l1 ++ l2)) -> ~ In a (filter_dup l2).
-Proof.
-  intros.
-  unfold not.
-  intros.
-  apply H.
-  clear H.
-  pose proof filter_dup_in _ _ H0.
-  apply filter_dup_in_inv.
-  apply in_or_app.
-  right.
-  auto.
 Qed.
 
 
@@ -1248,6 +1218,77 @@ Proof.
         apply Hf.
         simpl; right; auto.
 Qed.
+
+Lemma Forall2_app_l_break_r:
+  forall {A B: Type} (l1a l1b: list A) (l2: list B) (f: A -> B -> Prop),
+    Forall2 f (l1a ++ l1b) l2 ->
+    exists l2a l2b,
+      l2 = (l2a ++ l2b) /\
+      Forall2 f l1a l2a /\
+      Forall2 f l1b l2b.
+Proof.
+  intros.
+  revert l2 H.
+  induction l1a as [|a l1a' IH].
+  - exists [], l2.
+    simpl in H.
+    split; auto.
+  - intros.
+    destruct l2 as [|b l2'].
+    + simpl in H.
+      inversion H.
+    + simpl in H.
+      inversion H.
+      apply IH in H5.
+      destruct H5 as [l2a [l2b [Hl2 [Hl2a Hl2b]]]].
+      exists (b :: l2a), l2b.
+      split; auto.
+      rewrite Hl2.
+      simpl.
+      reflexivity.
+Qed. 
+
+Lemma Forall2_app_inv_both:
+  forall {A B: Type} (la1 la2: list A) (lb1 lb2: list B) (f: A -> B -> Prop),
+    length la1 = length lb1 ->
+    Forall2 f (la1 ++ la2) (lb1 ++ lb2) ->
+    Forall2 f la1 lb1 /\ Forall2 f la2 lb2.
+Proof.
+  intros A B la1 la2 lb1 lb2 f Hlen1 Happ.
+  pose proof F2_sl Happ as Hlenab.
+  repeat rewrite app_length in Hlenab.
+  assert (length la2 = length lb2) as Hlen2 by lia.
+  clear Hlenab.
+  revert lb1 lb2 Hlen1 Hlen2 Happ.
+  induction la1 as [| a la1' IH].
+  - intros.
+    assert (lb1 = []) by (apply length_zero_iff_nil; auto).
+    subst.
+    split.
+    + constructor.
+    + auto.
+  - intros.
+    destruct lb1 as [| b lb1'].
+    + inversion Hlen1.
+    + simpl in Happ.
+      pose proof Forall2_inv Happ as [Hab Happ'].
+      assert (length la1' = length lb1') as Hlen1' by 
+        (inversion Hlen1; auto).
+      specialize (IH _ _ Hlen1' Hlen2 Happ').
+      destruct IH as [Hla1 Hla2].
+      split.
+      * constructor; auto.
+      * auto.
+Qed.
+
+End Forall2.
+
+Section combine.
+
+(* 
+  properties of combine in addition to those given in Coq standard library.
+  especially with two lists of same length.
+*)
 
 Lemma combine_exists:
   forall {A B: Type} (l: list (A * B)),
@@ -1349,101 +1390,6 @@ Proof.
       apply H1; auto.
 Qed.
 
-#[export] Instance incl_perm_congr {A: Type}:
-  Proper (Permutation (A:=A) ==> Permutation (A:=A) ==> iff) (incl (A:=A)).
-Proof.
-  unfold Proper, respectful.
-  intros.
-  unfold incl.
-  split; intros.
-  - rewrite <- H in H2.
-    pose proof H1 _ H2.
-    rewrite <- H0.
-    auto.
-  - rewrite H in H2.
-    pose proof H1 _ H2.
-    rewrite H0.
-    auto.
-Qed.
-
-Lemma Permutation_filter_dup_concat_incl:
-  forall {A: Type} (l1: list A) (l2: list (list A)),
-    Permutation l1 (filter_dup (concat l2)) ->
-    (
-      forall l, In l l2 -> incl l l1
-    ).
-Proof.
-  intros.
-  apply in_listlist_concat_incl in H0.
-  rewrite H.
-  apply filter_dup_incl_list.
-  auto.
-Qed.
-
-Lemma Forall2_app_l_break_r:
-  forall {A B: Type} (l1a l1b: list A) (l2: list B) (f: A -> B -> Prop),
-    Forall2 f (l1a ++ l1b) l2 ->
-    exists l2a l2b,
-      l2 = (l2a ++ l2b) /\
-      Forall2 f l1a l2a /\
-      Forall2 f l1b l2b.
-Proof.
-  intros.
-  revert l2 H.
-  induction l1a as [|a l1a' IH].
-  - exists [], l2.
-    simpl in H.
-    split; auto.
-  - intros.
-    destruct l2 as [|b l2'].
-    + simpl in H.
-      inversion H.
-    + simpl in H.
-      inversion H.
-      apply IH in H5.
-      destruct H5 as [l2a [l2b [Hl2 [Hl2a Hl2b]]]].
-      exists (b :: l2a), l2b.
-      split; auto.
-      rewrite Hl2.
-      simpl.
-      reflexivity.
-Qed. 
-
-Lemma Forall2_app_inv_both:
-  forall {A B: Type} (la1 la2: list A) (lb1 lb2: list B) (f: A -> B -> Prop),
-    length la1 = length lb1 ->
-    Forall2 f (la1 ++ la2) (lb1 ++ lb2) ->
-    Forall2 f la1 lb1 /\ Forall2 f la2 lb2.
-Proof.
-  intros A B la1 la2 lb1 lb2 f Hlen1 Happ.
-  pose proof F2_sl Happ as Hlenab.
-  repeat rewrite app_length in Hlenab.
-  assert (length la2 = length lb2) as Hlen2 by lia.
-  clear Hlenab.
-  revert lb1 lb2 Hlen1 Hlen2 Happ.
-  induction la1 as [| a la1' IH].
-  - intros.
-    assert (lb1 = []) by (apply length_zero_iff_nil; auto).
-    subst.
-    split.
-    + constructor.
-    + auto.
-  - intros.
-    destruct lb1 as [| b lb1'].
-    + inversion Hlen1.
-    + simpl in Happ.
-      pose proof Forall2_inv Happ as [Hab Happ'].
-      assert (length la1' = length lb1') as Hlen1' by 
-        (inversion Hlen1; auto).
-      specialize (IH _ _ Hlen1' Hlen2 Happ').
-      destruct IH as [Hla1 Hla2].
-      split.
-      * constructor; auto.
-      * auto.
-Qed.
-
-
-(** Partition and permutation of list *)
 
 Lemma app_combine_combine:
   forall {A B: Type} (l1 l3: list A) (l2 l4: list B),
@@ -1561,6 +1507,63 @@ Proof.
   auto.
 Qed.
 
+Lemma list_pair_exists_combine:
+  forall {A B: Type} (l: list (A * B)),
+    exists la lb,
+      l = combine la lb /\
+      length la = length lb.
+Proof.
+  intros.
+  exists (map fst l), (map snd l).
+  split.
+  - induction l as [| [a b] l IH].
+    + simpl.
+      reflexivity.
+    + simpl.
+      f_equal; auto.
+  - induction l as [| [a b] l IH].
+    + simpl.
+      reflexivity.
+    + simpl.
+      f_equal; auto.
+Qed.
+
+Lemma In_combine_l_inv:
+  forall {A B: Type} (l1: list A) (l2: list B) (a: A),
+    length l1 = length l2 ->
+    In a l1 ->
+    exists b, In (a, b) (combine l1 l2).
+Proof.
+  intros.
+  revert l2 H.
+  induction l1 as [| a1 l1 IH].
+  - inversion H0.
+  - intros.
+    destruct l2 as [| b l2].
+    + inversion H.
+    + simpl in H.
+      injection H as H.
+      destruct H0.
+      * subst.
+        exists b.
+        simpl.
+        auto.
+      * specialize (IH H0).
+        specialize (IH l2 H).
+        destruct IH as [b' Hin].
+        exists b'.
+        simpl.
+        auto.
+Qed.
+
+End combine.
+
+Section list_partition_permutation.
+
+(* 
+  properties of partitioning a list into two lists based on a condition,
+  or permutation of a list with respect to another list.
+*)
 
 Lemma Permutation_combine_wrt_left {A B: Type}:
   forall (l1: list A) (l2: list B) (l1': list A),
@@ -1731,55 +1734,6 @@ Proof.
         rewrite <- Hperm in H.
         pose proof in_app_or t1 t2 a H as [H1 | H2]; auto.
         contradiction.
-Qed.
-
-Lemma list_pair_exists_combine:
-  forall {A B: Type} (l: list (A * B)),
-    exists la lb,
-      l = combine la lb /\
-      length la = length lb.
-Proof.
-  intros.
-  exists (map fst l), (map snd l).
-  split.
-  - induction l as [| [a b] l IH].
-    + simpl.
-      reflexivity.
-    + simpl.
-      f_equal; auto.
-  - induction l as [| [a b] l IH].
-    + simpl.
-      reflexivity.
-    + simpl.
-      f_equal; auto.
-Qed.
-
-Lemma In_combine_l_inv:
-  forall {A B: Type} (l1: list A) (l2: list B) (a: A),
-    length l1 = length l2 ->
-    In a l1 ->
-    exists b, In (a, b) (combine l1 l2).
-Proof.
-  intros.
-  revert l2 H.
-  induction l1 as [| a1 l1 IH].
-  - inversion H0.
-  - intros.
-    destruct l2 as [| b l2].
-    + inversion H.
-    + simpl in H.
-      injection H as H.
-      destruct H0.
-      * subst.
-        exists b.
-        simpl.
-        auto.
-      * specialize (IH H0).
-        specialize (IH l2 H).
-        destruct IH as [b' Hin].
-        exists b'.
-        simpl.
-        auto.
 Qed.
 
 Lemma list_pair_partition_l:
@@ -2002,6 +1956,12 @@ Proof.
   apply Permutation_length; auto.
 Qed.
 
+End list_partition_permutation.
+
+Section misc.
+
+(** Other lemmas *)
+
 Lemma perm_map:
   forall (A B: Type) (f: A -> B) (l1 l2: list A),
     Permutation l1 l2 ->
@@ -2017,10 +1977,6 @@ Proof.
     constructor.
   - apply Permutation_trans with (l' := map f l'); assumption.
 Qed.
-
-
-
-(** Other lemmas *)
 
 
 Lemma list_eq_nil:
@@ -2245,6 +2201,98 @@ Proof.
     pose proof Rge_antisym _ _ H r.
     contradiction.
 Qed.
+
+Lemma In_concat_map_exists {A B: Type}:
+  forall (l: list A) (f: A -> list B) (b: B),
+    In b (concat (map f l)) ->
+    exists a, In a l /\ In b (f a).
+Proof.
+  intros.
+  apply in_concat in H.
+  destruct H as [l' [? ?]].
+  apply in_map_iff in H.
+  destruct H as [a [? ?]].
+  subst.
+  exists a.
+  auto.
+Qed.
+
+Lemma in_exists_remaining_list_perm:
+  forall {A: Type} (l: list A) (a: A) ,
+    In a l -> exists l', Permutation l (a :: l').
+Proof.
+  induction l.
+  - contradiction.
+  - intros.
+    destruct H.
+    + subst.
+      exists l.
+      apply Permutation_refl.
+    + specialize (IHl a0 H).
+      destruct IHl as [l' H_perm].
+      exists (a :: l').
+      (* Search Permutation. *)
+      pose proof perm_swap a a0 l' as H_swap.
+      pose proof Permutation_trans.
+      specialize (H0 A (a :: l) (a :: a0 :: l') (a0 :: a :: l')).
+      apply H0.
+      * apply Permutation_cons; auto.
+      * apply Permutation_sym.
+        apply H_swap.
+Qed.
+
+Lemma in_map_eq:
+  forall {A B: Type} (f: A -> B) (g: A -> B) (l: list A),
+    (forall a, In a l -> f a = g a) -> 
+    map f l = map g l.
+Proof.
+  intros.
+  induction l.
+  - reflexivity.
+  - simpl.
+    f_equal.
+    + apply H.
+      simpl; auto.
+    + apply IHl.
+      intros.
+      apply H.
+      simpl; auto.
+Qed.
+
+#[export] Instance incl_perm_congr {A: Type}:
+  Proper (Permutation (A:=A) ==> Permutation (A:=A) ==> iff) (incl (A:=A)).
+Proof.
+  unfold Proper, respectful.
+  intros.
+  unfold incl.
+  split; intros.
+  - rewrite <- H in H2.
+    pose proof H1 _ H2.
+    rewrite <- H0.
+    auto.
+  - rewrite H in H2.
+    pose proof H1 _ H2.
+    rewrite H0.
+    auto.
+Qed.
+
+Lemma Permutation_filter_dup_concat_incl:
+  forall {A: Type} (l1: list A) (l2: list (list A)),
+    Permutation l1 (filter_dup (concat l2)) ->
+    (
+      forall l, In l l2 -> incl l l1
+    ).
+Proof.
+  intros.
+  apply in_listlist_concat_incl in H0.
+  rewrite H.
+  apply filter_dup_incl_list.
+  auto.
+Qed.
+
+End misc.
+
+Section sum_prob.
 
 
 (*********************************************************)
@@ -2681,3 +2729,5 @@ Proof.
     specialize (Hsumge Hnodupasubl Hnodupl).
     lra.
 Qed.
+
+End sum_prob.
