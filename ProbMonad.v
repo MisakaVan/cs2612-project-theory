@@ -731,37 +731,6 @@ Proof.
     tauto.
 Qed.
 
-Lemma map_fst_map_pair:
-  forall (T A B: Type),
-  forall (lt: list T),
-  forall (f: T -> (A * B)),
-  map fst (map f lt) = map (fun x => fst (f x)) lt.
-Proof.
-  intros.
-  revert lt.
-  induction lt.
-  - simpl.
-    reflexivity.
-  - simpl.
-    rewrite IHlt.
-    reflexivity.
-Qed.
-
-Lemma map_snd_map_pair:
-  forall (T A B: Type),
-  forall (lt: list T),
-  forall (f: T -> (A * B)),
-  map snd (map f lt) = map (fun x => snd (f x)) lt.
-Proof.
-  intros.
-  revert lt.
-  induction lt.
-  - simpl.
-    reflexivity.
-  - simpl.
-    rewrite IHlt.
-    reflexivity.
-Qed.
 
 (** Level 1 *)
 #[export] Instance ProbDistr_imply_event_refl:
@@ -2541,18 +2510,6 @@ Proof.
 Qed.
 
 
-Lemma sum_map_split_two_lists:
-  forall {A: Type} (l: list A) (f: A -> R) (l1 l2: list A),
-    l = l1 ++ l2 ->
-    (sum (map f l) = sum (map f l1) + sum (map f l2))%R.
-Proof.
-  intros.
-  subst.
-  rewrite map_app.
-  rewrite sum_app.
-  reflexivity.
-Qed.
-
 Lemma all_nonneg_list_pos_exists_pos_element:
   forall (l: list R),
     (forall r, In r l -> r >= 0)%R ->
@@ -2584,24 +2541,6 @@ Proof.
       exists r_pos.
       split; auto.
       right; auto.
-Qed.
-
-Lemma NoDup_app_disjoint :
-  forall (A : Type) (l1 l2 : list A),
-    NoDup (l1 ++ l2) ->
-    (forall x, In x l1 -> ~ In x l2).
-Proof.
-  intros A l1 l2 H.
-  intros x Hx_l1 Hx_l2.
-  induction l1 as [|h t IH].
-  - contradiction.
-  - inversion H; subst.
-    destruct Hx_l1 as [Hx_l1 | Hx_l1].
-    + subst x.
-      apply H2. apply in_or_app. right. exact Hx_l2.
-    + apply IH.
-      * assumption.
-      * assumption.
 Qed.
     
 Theorem Always_conseq: forall {A: Type} (P Q: A -> Prop),
@@ -3453,29 +3392,6 @@ Proof.
         -- apply IHHforall2.
 Qed. 
   
-Lemma forall_to_forall2:
-  forall {A B: Type} (l1: list A) (l2: list B) (f: A -> B -> Prop),
-    (forall a b, In (a, b) (combine l1 l2) -> f a b) ->
-    length l1 = length l2 -> 
-      Forall2 f l1 l2.
-Proof.
-  intros A B l1 l2 f.
-  revert l2.
-  induction l1 as [|a l1 IH]; intros l2 H Hlen.
-  - destruct l2.
-    + constructor.
-    + simpl in Hlen. inversion Hlen.
-  - destruct l2 as [|b l2].
-    + simpl in Hlen. inversion Hlen.
-    + simpl in Hlen. inversion Hlen.
-      constructor.
-      * apply H.
-        simpl. left. reflexivity.
-      * apply IH; auto.
-        intros.
-        apply H.
-        simpl. right. auto.
-Qed.
 
 Lemma pair_eq_inversion : forall (A B : Type) (a a0 : A) (b b0 : B),
   (a, b) = (a0, b0) -> a = a0 /\ b = b0.
@@ -3604,20 +3520,6 @@ Proof.
 Qed.
 
 
-Lemma list_map_forall_exists:
-  forall {A B: Type} (f: A -> B -> Prop) (l1: list A),
-    (forall a, exists b, f a b) -> exists l2, Forall2 f l1 l2.
-Proof.
-  intros A B f l1 H.
-  induction l1 as [| a l1'].
-  - exists [].
-    constructor.
-  - destruct IHl1' as [l2 IH].
-    specialize (H a).
-    destruct H as [b Hb].
-    exists (b :: l2).
-    constructor; [tauto | exact IH].
-Qed.
 
 Lemma ProbDistr_sum_distr_exists:
   forall {A: Type} (l: list (R * Distr A)),
@@ -3627,23 +3529,6 @@ Proof.
   apply sum_distr_exists.
 Qed.
 
-
-Lemma sum_map_le_in:
-  forall {A: Type} (l: list A) (f1 f2: A -> R),
-    (forall a, In a l -> (f1 a <= f2 a)%R) ->
-    (sum (map f1 l) <= sum (map f2 l))%R.
-Proof.
-  intros.
-  induction l as [| a l'].
-  - simpl. lra.
-  - simpl.
-    assert (f1 a <= f2 a)%R as Hle by (apply H; simpl; auto).
-    enough (sum (map f1 l') <= sum (map f2 l'))%R by lra.
-    apply IHl'.
-    intros.
-    apply H.
-    simpl. right. auto.
-Qed.
 
 Lemma list_forall_imply_event_with_sum_distributions:
   forall (L1 L2 : list (R * Distr Prop)) (ds1 ds2 : Distr Prop),
@@ -4288,91 +4173,6 @@ Proof.
   }
   pose proof ProbDistr_imply_event_equiv_event.
   auto.
-Qed.
-
-Lemma list_eq_nil:
-  forall (A : Type) (l : list A),
-    (forall x, In x l -> False) ->
-    l = [].
-Proof.
-  intros A l H.
-  destruct l as [|x xs].
-  - reflexivity.
-  - simpl in H. exfalso. specialize (H x).
-    apply H. left. reflexivity.
-Qed.
-
-Lemma one_element_list:
-  forall {A: Type} {l: list A} {a},
-    In a l -> (forall b, b <> a -> ~ In b l) -> NoDup l -> l = [a].
-Proof.
-  intros A l a H_in H_unique H_nodup.
-  induction l as [|x xs IH].
-  - (* l = [] *)
-    simpl in H_in.
-    contradiction.
-  - (* l = x :: xs *)
-    simpl in H_in.
-    destruct H_in as [H_eq | H_in'].
-    + (* x = a *)
-      (* 需要证明 xs = [] *)
-      assert (forall y, In y xs -> y = a).
-      {
-        intros y H_y.
-        specialize (H_unique y).
-        destruct (classic (y = a)) as [Hya | Hnya].
-        * assumption.
-        * exfalso.
-          apply H_unique.
-          -- exact Hnya.
-          -- right. exact H_y.
-      }
-      (* 由于 l 没有重复元素，且所有 y ∈ xs 都等于 a，因此 xs 必须为空 *)
-      assert (xs = []).
-      {
-        apply list_eq_nil.
-        intros y H_y.
-        specialize (H y).
-        assert (y = a) by auto.
-        subst.
-        apply NoDup_cons_iff in H_nodup.
-        destruct H_nodup as [H_nodup _].
-        tauto.
-      }
-      subst.
-      reflexivity.
-    + (* In a xs *)
-      (* 由于 H_unique 表明除了 a 之外，列表中没有其他元素，且 x ∈ l *)
-      (* 因此 x 必须等于 a *)
-      assert (x = a).
-      {
-        specialize (H_unique x).
-        destruct (classic (x = a)) as [Hxa | Hxna].
-        * exact Hxa.
-        * exfalso.
-          apply H_unique.
-          -- exact Hxna.
-          -- left. reflexivity.
-      }
-      subst x.
-      (* 现在 l = a :: xs，且 NoDup l *)
-      (* 根据 H_unique，xs 中不能有元素不同于 a，但 l 无重复元素，故 xs 必须为空 *)
-      assert (xs = []).
-      {
-        apply list_eq_nil.
-        intros y H_y.
-        specialize (H_unique y).
-        destruct (classic (y = a)) as [Hya | Hnya].
-        * subst.
-          apply NoDup_cons_iff in H_nodup.
-          destruct H_nodup as [H_nodup _].
-          tauto.
-        * exfalso. apply H_unique.
-          -- exact Hnya.
-          -- right. exact H_y.          
-      }
-      rewrite H.
-      reflexivity.
 Qed.
 
 (** Level 2 *)
@@ -6149,18 +5949,7 @@ Proof.
 Qed.
 
 
-Lemma concat_map_singleton:
-  forall {A: Type}
-         (l: list A),
-    concat (map (fun x => [x]) l) = l.
-Proof.
-  intros.
-  induction l.
-  - simpl. reflexivity.
-  - simpl.
-    rewrite IHl.
-    reflexivity.
-Qed.
+
 
 (** Level 3 *)
 Lemma bind_ret_r:
