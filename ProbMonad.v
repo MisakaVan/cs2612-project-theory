@@ -1791,6 +1791,47 @@ Proof.
     discriminate.
 Qed.
 
+Lemma list_partition_in_notin_iff:
+  forall {A: Type} (l t: list A),
+    incl l t ->
+    exists t1 t2,
+      Permutation (t1 ++ t2) t /\
+      forall a, In a t ->
+      (In a t1 <-> In a l) /\
+      (In a t2 <-> ~ In a l).
+Proof.
+  intros A l t Hincl.
+  pose proof list_partition_in_notin l t as [t1 [t2 [Hperm [Ht1 Ht2]]]].
+  unfold incl in Hincl.
+  exists t1, t2.
+  split; auto.
+  split.
+  - intros.
+    split.
+    + apply Ht1.
+    + intros.
+      destruct (in_dec eq_dec a t2).
+      * exfalso.
+        apply Ht2 in i.
+        contradiction.
+      * 
+        rewrite <- Hperm in H.
+        pose proof in_app_or t1 t2 a H as [H1 | H2]; auto.
+        contradiction.
+  - intros.
+    split.
+    + apply Ht2.
+    + intros.
+      destruct (in_dec eq_dec a t1).
+      * exfalso.
+        apply Ht1 in i.
+        contradiction.
+      *
+        rewrite <- Hperm in H.
+        pose proof in_app_or t1 t2 a H as [H1 | H2]; auto.
+        contradiction.
+Qed.
+
 Lemma list_pair_exists_combine:
   forall {A B: Type} (l: list (A * B)),
     exists la lb,
@@ -5821,21 +5862,310 @@ Proof.
   apply sum_distr_exists.
 Qed.
 
+Lemma map_combine_l:
+  forall {A B C: Type} (f: A -> C) (l1: list A) (l2: list B),
+    length l1 = length l2 ->
+    map f l1 = map (fun '(a, _) => f a) (combine l1 l2).
+Proof.
+Admitted.
+
+Lemma map_combine_r:
+  forall {A B C: Type} (f: B -> C) (l1: list A) (l2: list B),
+    length l1 = length l2 ->
+    map f l2 = map (fun '(_, b) => f b) (combine l1 l2).
+Proof.
+Admitted.
+
+Lemma sum_map_le_in:
+  forall {A: Type} (l: list A) (f1 f2: A -> R),
+    (forall a, In a l -> (f1 a <= f2 a)%R) ->
+    (sum (map f1 l) <= sum (map f2 l))%R.
+Proof.
+  intros.
+  induction l as [| a l'].
+  - simpl. lra.
+  - simpl.
+    assert (f1 a <= f2 a)%R as Hle by (apply H; simpl; auto).
+    enough (sum (map f1 l') <= sum (map f2 l'))%R by lra.
+    apply IHl'.
+    intros.
+    apply H.
+    simpl. right. auto.
+Qed.
+
 Lemma list_forall_imply_event_with_sum_distributions:
   forall (L1 L2 : list (R * Distr Prop)) (ds1 ds2 : Distr Prop),
-     Forall2 (fun '(r1, d1) '(r2, d2) => r1 = r2 /\ ProbDistr.imply_event d1 d2) L1 L2
+     Forall2 (fun '(r1, d1) '(r2, d2) => r1 = r2 /\ (r1 >= 0)%R /\ ProbDistr.imply_event d1 d2
+     /\ ProbDistr.legal d1 /\ ProbDistr.legal d2) L1 L2
   -> ProbDistr.sum_distr L1 ds1 
   -> ProbDistr.sum_distr L2 ds2
   -> ProbDistr.imply_event ds1 ds2.
 Proof.
-  intros.
-  induction H.
-  - unfold ProbDistr.imply_event.
-    destruct H0 as [H_pset1 H_prob1].
-    destruct H1 as [H_pset2 H_prob2].
-    exists 0%R, 0%R.
-    repeat split; [| | lra].
-Admitted.
+  intros L1 L2 d1 d2 HL Hsum1 Hsum2.
+  unfold ProbDistr.imply_event.
+  pose proof ProbDistr_compute_pr_exists d1 as [r1 Hd1].
+  pose proof ProbDistr_compute_pr_exists d2 as [r2 Hd2].
+  exists r1, r2.
+  repeat split; auto.
+  destruct Hsum1 as [Hperm1 Hprob1].
+  destruct Hsum2 as [Hperm2 Hprob2].
+  unfold ProbDistr.compute_pr in *.
+  destruct Hd1 as [l1 [Hl1 [Hr1 Hnodup1]]].
+  destruct Hd2 as [l2 [Hl2 [Hr2 Hnodup2]]].
+  rewrite <- Hr1, <- Hr2.
+  unfold sum_prob.
+  unfold ProbDistr.imply_event in *.
+
+  assert (d1.(prob) = fun a => sum (map (fun '(r, d) => (r * d.(prob) a)%R) L1)) as Hprob1' by (apply functional_extensionality; auto).
+  clear Hprob1.
+  assert (d1.(prob) = fun a => sum (map (fun '((r, d), _) => (r * d.(prob) a)%R) (combine L1 L2))) as Hprob1. {
+    apply functional_extensionality.
+    intros a.
+    rewrite Hprob1'.
+    f_equal.
+    apply map_combine_l.
+    apply (F2_sl HL).
+  }
+  clear Hprob1'.
+
+  assert (d2.(prob) = fun a => sum (map (fun '(r, d) => (r * d.(prob) a)%R) L2)) as Hprob2' by (apply functional_extensionality; auto).
+  clear Hprob2.
+  assert (d2.(prob) = fun a => sum (map (fun '(_, (r, d)) => (r * d.(prob) a)%R) (combine L1 L2))) as Hprob2. {
+    apply functional_extensionality.
+    intros a.
+    rewrite Hprob2'.
+    f_equal.
+    apply map_combine_r.
+    apply (F2_sl HL).
+  }
+  clear Hprob2'.
+  
+  remember (sum (map d1.(prob) l1)) as lhs.
+  remember (sum (map d2.(prob) l2)) as rhs.
+
+  rewrite Hprob1 in Heqlhs.
+  erewrite sum_map_sum_map in Heqlhs.
+  rewrite Hprob2 in Heqrhs.
+  erewrite sum_map_sum_map in Heqrhs.
+  subst.
+
+  apply sum_map_le_in.
+  intros [[ra da] [rb db]] Hin.
+
+  pose proof Forall2_in_combine _ _ _ HL _ _ Hin as H; simpl in H.
+  destruct H as [H_eq_r [H_ge_0 H_imp]].
+  destruct H_imp as [H_imp [legal_da legal_db]].
+  destruct H_imp as [r1 [r2 [Hr1 [Hr2 H_imp]]]].
+
+  repeat rewrite sum_map_multi.
+  subst ra.
+
+
+  enough (sum (map da.(prob) l1) = r1 /\ (sum (map db.(prob) l2)) = r2)%R by (apply Rmult_le_compat_l; lra).
+  split.
+  {
+    clear Hr2 legal_db H_imp.
+    unfold ProbDistr.compute_pr in Hr1.
+    destruct Hr1 as [l1' [Hl1' [Hr1' Hnodup1']]].
+    unfold sum_prob in Hr1'.
+    rewrite <- Hr1'.
+
+  (* 
+    l1 is all the d1.(pset) props that holds.
+    d1.(pset) = all the psets from L1.
+    da is from L1.
+    so l1 contains all the props that holds for da.
+    l1 also contains all the props that holds that are not in da, which will map to 0 with da.(prob).
+  *)
+    assert (incl l1' l1) as Hincl. {
+      unfold incl.
+      intros a Hinl1'.
+      clear Hprob1 Hprob2 Hperm2.
+      (* da is in L1 *)
+      pose proof in_combine_l _ _ _ _ Hin.
+      assert (incl da.(pset) d1.(pset)) as Hincl. {
+        rewrite Hperm1.
+        assert (In da.(pset) (map (fun '(_, d) => d.(pset)) L1)).
+        {
+          apply in_map_iff.
+          exists (rb, da).
+          split; auto.
+        }
+        unfold incl.
+        intros a0 Hin0.
+        rewrite <- filter_dup_in_iff.
+        apply in_concat.
+        exists da.(pset).
+        simpl; auto.
+      }
+      pose proof Hl1 a.
+      pose proof Hl1' a.
+      apply H1 in Hinl1'.
+      destruct Hinl1' as [Hindapset Haholds].
+      apply H0.
+      unfold incl in Hincl.
+      split; auto.
+    }
+
+
+    pose proof list_partition_in_notin_iff l1' l1 Hincl.
+    destruct H as [l1_in [l1_notin [H_partition H]]].
+    enough (Permutation l1' l1_in). {
+      rewrite <- H_partition.
+      rewrite H0.
+      rewrite map_app.
+      rewrite sum_app.
+      enough (sum (map da.(prob) l1_notin) = 0)%R by lra.
+      apply sum_map_zero.
+      intros.
+      assert (In a l1) as Hinl1. {
+        rewrite <- H_partition.
+        apply in_or_app; auto.
+      }
+      pose proof H a Hinl1 as [_ Hnotin].
+      apply Hnotin in H1.
+      pose proof Hl1 a as H_a_in_l1.
+      apply H_a_in_l1 in Hinl1.
+      destruct Hinl1 as [H_a_in_d1pset Haholds].
+      assert (~(In a da.(pset) /\ a)). {
+        pose proof Hl1' a.
+        tauto.
+      }
+      unfold not in H2.
+      assert (~(In a da.(pset))). {
+        intros H3.
+        tauto.
+      }
+      destruct legal_da.
+      assert (~(da.(prob) a > 0)%R). {
+        pose proof legal_pset_valid a.
+        tauto.
+      }
+      pose proof legal_nonneg a.
+      unfold not in H4.
+      apply Rnot_gt_le in H4.
+      lra.
+    }
+    apply NoDup_Permutation; auto.
+    - eapply nodup_app_l.
+      rewrite H_partition.
+      apply Hnodup1.
+    - intros a.
+      split.
+      {
+        intros Hinl1'.
+        assert (In a l1) as Hinl1 by (apply Hincl; auto).
+        pose proof H a Hinl1 as [? _].
+        tauto.
+      }
+      {
+        intros Hinl1_in.
+        assert (In a l1) as Hinl1. {
+          rewrite <- H_partition.
+          apply in_or_app; auto.
+        }
+        pose proof H a Hinl1 as [? _].
+        tauto.
+      }
+  }
+  {
+    clear Hr1 legal_da H_imp.
+    unfold ProbDistr.compute_pr in Hr2.
+    destruct Hr2 as [l2' [Hl2' [Hr2' Hnodup2']]].
+    unfold sum_prob in Hr2'.
+    rewrite <- Hr2'.
+
+    assert (incl l2' l2) as Hincl. {
+      unfold incl.
+      intros a Hinl2'.
+      clear Hprob1 Hprob2 Hperm1.
+      (* db is in L2 *)
+      pose proof in_combine_r _ _ _ _ Hin.
+      assert (incl db.(pset) d2.(pset)) as Hincl. {
+        rewrite Hperm2.
+        assert (In db.(pset) (map (fun '(_, d) => d.(pset)) L2)).
+        {
+          apply in_map_iff.
+          exists (rb, db).
+          split; auto.
+        }
+        unfold incl.
+        intros a0 Hin0.
+        rewrite <- filter_dup_in_iff.
+        apply in_concat.
+        exists db.(pset).
+        simpl; auto.
+      }
+      pose proof Hl2 a.
+      pose proof Hl2' a.
+      apply H1 in Hinl2'.
+      destruct Hinl2' as [Hindapset Haholds].
+      apply H0.
+      unfold incl in Hincl.
+      split; auto.
+    }
+
+    pose proof list_partition_in_notin_iff l2' l2 Hincl.
+    destruct H as [l2_in [l2_notin [H_partition H]]].
+    enough (Permutation l2' l2_in). {
+      rewrite <- H_partition.
+      rewrite H0.
+      rewrite map_app.
+      rewrite sum_app.
+      enough (sum (map db.(prob) l2_notin) = 0)%R by lra.
+      apply sum_map_zero.
+      intros.
+      assert (In a l2) as Hinl2. {
+        rewrite <- H_partition.
+        apply in_or_app; auto.
+      }
+      pose proof H a Hinl2 as [_ Hnotin].
+      apply Hnotin in H1.
+      pose proof Hl2 a as H_a_in_l2.
+      apply H_a_in_l2 in Hinl2.
+      destruct Hinl2 as [H_a_in_d2pset Haholds].
+      assert (~(In a db.(pset) /\ a)). {
+        pose proof Hl2' a.
+        tauto.
+      }
+      unfold not in H2.
+      assert (~(In a db.(pset))). {
+        intros H3.
+        tauto.
+      }
+      destruct legal_db.
+      assert (~(db.(prob) a > 0)%R). {
+        pose proof legal_pset_valid a.
+        tauto.
+      }
+      pose proof legal_nonneg a.
+      unfold not in H4.
+      apply Rnot_gt_le in H4.
+      lra.
+  }
+  apply NoDup_Permutation; auto.
+  - eapply nodup_app_l.
+    rewrite H_partition.
+    apply Hnodup2.  
+  - intros a.
+    split.
+    {
+      intros Hinl2'.
+      assert (In a l2) as Hinl2 by (apply Hincl; auto).
+      pose proof H a Hinl2 as [? _].
+      tauto.
+    }
+    {
+      intros Hinl2_in.
+      assert (In a l2) as Hinl2. {
+        rewrite <- H_partition.
+        apply in_or_app; auto.
+      }
+      pose proof H a Hinl2 as [? _].
+      tauto.
+    }
+  }
+Qed.
 
 Lemma Forall2_imply_event_pairs :
   forall (X: Type) (distX: Distr X) (mapG mapH: X -> ProbMonad.M Prop)
