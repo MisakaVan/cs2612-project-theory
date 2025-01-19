@@ -5844,46 +5844,6 @@ Proof.
   apply combine_rd_induction with (n := length dA.(pset)); auto.
 Qed.
 
-Lemma sum_distr_imply_imply:
-  forall dx dy lx ly,
-    ProbDistr.sum_distr lx dx ->
-    ProbDistr.sum_distr ly dy ->
-    Forall2 (fun '(rx, dx) '(ry, dy) => rx = ry /\ ProbDistr.imply_event dx dy) lx ly ->
-    ProbDistr.imply_event dx dy.
-Proof.
-  intros.
-  destruct H as [? ? ].
-  destruct H0 as [? ?].
-Admitted.
-
-Lemma exists_dp_based_on_l:
-  forall {A: Type} (dA: Distr A) (f : A -> ProbMonad.M Prop) (g : A -> ProbMonad.M Prop) (lx: list (R * Distr Prop)) (ly: list (R * Distr Prop)),
-    Forall2 (fun (a : A) '(r, d) => r = dA.(prob) a /\ (f a).(distr) d) dA.(pset) lx ->
-    Forall2 (fun (a : A) '(r, d) => r = dA.(prob) a /\ (g a).(distr) d) dA.(pset) ly ->
-    Forall2 (fun '(rx, dx) '(ry, dy) => rx = ry /\ ProbDistr.imply_event dx dy) lx ly ->
-    exists dPx dPy,
-      ProbDistr.sum_distr lx dPx /\
-      ProbDistr.sum_distr ly dPy /\
-      ProbDistr.imply_event dPx dPy.
-Proof.
-  intros.
-  set (x_pset := filter_dup (concat (map (fun '(_, d) => d.(pset)) lx))).
-  set (y_pset := filter_dup (concat (map (fun '(_, d) => d.(pset)) ly))).
-  set (x_prob := fun a => sum (map (fun '(r, d) => r * d.(prob) a)%R lx)).
-  set (y_prob := fun a => sum (map (fun '(r, d) => r * d.(prob) a)%R ly)).
-  set (dPx := {| ProbDistr.pset := x_pset; ProbDistr.prob := x_prob; |}).
-  set (dPy := {| ProbDistr.pset := y_pset; ProbDistr.prob := y_prob; |}).
-  exists dPx, dPy.
-  assert (ProbDistr.sum_distr lx dPx) as H_sum_lx. {
-    repeat split; auto.
-  }
-  assert (ProbDistr.sum_distr ly dPy) as H_sum_ly. {
-    repeat split; auto.
-  }
-  repeat split; auto.
-  pose proof sum_distr_imply_imply dPx dPy lx ly H_sum_lx H_sum_ly H1 as H_imp_dPx_dPy.
-  assumption.
-Qed.
 
 Lemma list_map_forall_exists:
   forall {A B: Type} (f: A -> B -> Prop) (l1: list A),
