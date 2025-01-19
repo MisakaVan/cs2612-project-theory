@@ -2472,3 +2472,212 @@ Proof.
   apply sum_perm.
   auto.
 Qed.
+
+
+Definition eq_fun {A B: Type} (f1 f2: A -> B): Prop :=
+  forall a, f1 a = f2 a.
+
+#[export] Instance sum_prob_congr {A: Type}:
+  Proper (Permutation (A:=A) ==> eq_fun ==> eq) (@sum_prob A).
+Proof.
+  unfold Proper, respectful.
+  intros l1 l2 Hl r1 r2 ?.
+  unfold eq_fun in H.
+  unfold sum_prob.
+  rewrite Hl. 
+  apply sum_congr.
+  induction Hl.
+  - reflexivity.
+  - simpl.
+    rewrite H.
+    (* Search Permutation. *)
+    apply perm_skip.
+    assumption.
+  - simpl.
+    repeat rewrite H.
+    apply perm_skip.
+    apply perm_skip.
+    induction l.
+    + constructor.
+    + simpl.
+      rewrite H.
+      apply perm_skip.
+      assumption.
+  - assumption.
+Qed.
+
+
+Lemma nonneg_sublist_sum_le:
+  forall {A: Type} (l: list A) (f: A -> R) (r: R) (subl: list A),
+    (forall a, In a l -> f a >= 0)%R ->
+    sum (map f l) = r ->
+    incl subl l ->
+    NoDup subl ->
+    NoDup l ->
+    (sum (map f subl) <= r)%R.
+Proof.
+  intros.
+  pose proof list_partition_in_notin subl l as H_partition.
+  destruct H_partition as [l_in [l_notin [H_perm [H_in H_notin]]]].
+  subst r.
+  rewrite <- H_perm.
+  rewrite map_app.
+  rewrite sum_app.
+  assert (Permutation subl l_in) as H_perm_subl_l_in. {
+    unfold incl in H1.
+    apply NoDup_Permutation.
+    - assumption.
+    - eapply perm_nodup_app_l.
+      apply H_perm.
+      assumption.
+    - intros.
+      split.
+      + intros H_in_subl.
+        destruct (in_dec eq_dec x l_notin) as [H_in_notin | H_notin_notin].
+        * apply H_notin in H_in_notin.
+          contradiction.
+        * apply H1 in H_in_subl.
+          rewrite <- H_perm in H_in_subl.
+          apply in_app_or in H_in_subl.
+          destruct H_in_subl; auto; contradiction.
+      + intros H_in_l_in.
+        apply H_in; auto.
+  }
+  rewrite H_perm_subl_l_in.
+  enough (sum (map f l_notin) >= 0)%R by lra.
+  apply sum_map_ge_zero.
+  intros.
+  assert (In a l). {
+    eapply Permutation_in.
+    apply H_perm.
+    apply in_app_iff.
+    auto.
+  }
+  apply H.
+  apply H4.
+Qed.
+
+Lemma nonneg_sublist_sum_ge:
+  forall {A: Type} (l: list A) (f: A -> R) (r: R) (subl: list A),
+    (forall a, In a l -> f a >= 0)%R ->
+    sum (map f subl) = r ->
+    incl subl l ->
+    NoDup subl ->
+    NoDup l ->
+    (sum (map f l) >= r)%R.
+Proof.
+  intros.
+  pose proof list_partition_in_notin subl l as H_partition.
+  destruct H_partition as [l_in [l_notin [H_perm [H_in H_notin]]]].
+  unfold incl in *.
+  assert (Permutation subl l_in) as H_perm_subl_l_in. {
+    apply NoDup_Permutation.
+    - assumption.
+    - eapply perm_nodup_app_l.
+      apply H_perm.
+      assumption.
+    - intros.
+      split.
+      + intros H_in_subl.
+        destruct (in_dec eq_dec x l_notin) as [H_in_notin | H_notin_notin].
+        * apply H_notin in H_in_notin.
+          contradiction.
+        * apply H1 in H_in_subl.
+          rewrite <- H_perm in H_in_subl.
+          apply in_app_or in H_in_subl.
+          destruct H_in_subl; auto; contradiction.
+      + intros H_in_l_in.
+        apply H_in; auto.
+  }
+  rewrite <- H_perm.
+  subst.
+  rewrite H_perm_subl_l_in.
+  rewrite map_app.
+  rewrite sum_app.
+  enough (sum (map f l_notin) >= 0)%R by lra.
+  apply sum_map_ge_zero.
+  intros.
+  assert (In a l). {
+    eapply Permutation_in.
+    apply H_perm.
+    apply in_app_iff.
+    auto.
+  }
+  apply H.
+  apply H4.
+Qed.
+
+Lemma sumup_incl:
+  forall {A: Type} (zero_list pos_list l: list A) (f: A -> R) (r: R),
+    NoDup l ->
+    Permutation l (zero_list ++ pos_list) ->
+    (forall a, In a zero_list -> f a = 0)%R ->
+    (forall a, In a pos_list -> f a > 0)%R ->
+    sum (map f pos_list) = r ->
+    (r >= 0)%R ->
+    (forall subl, NoDup subl -> incl subl l -> (sum (map f subl) = r)%R -> incl pos_list subl).
+Proof.
+  intros A zero_list pos_list l f r Hnodupl HP Hzero Hpos Hsumpos Hr subl Hnodupsubl Hsubl Hsumsubl.
+  unfold incl.
+  intros a Ha.
+  pose proof Hpos a Ha as Hfapos.
+  destruct (in_dec eq_dec a subl) as [Hin | Hnotin].
+  + auto.
+  + assert (sum (map f (a :: subl)) = (f a) + r)%R. {
+      simpl.
+      lra.
+    }
+    assert (forall a : A, In a l -> (f a >= 0)%R). {
+      intros.
+      destruct (in_dec eq_dec a0 zero_list) as [Hin0 | Hnin0].
+      - specialize (Hzero a0 Hin0).
+        lra.
+      - assert (In a0 (zero_list ++ pos_list)). {
+          apply Permutation_in with (l := l); auto.
+        }
+        apply in_app_or in H1.
+        destruct H1.
+        + contradiction.
+        + specialize (Hpos a0 H1).
+          lra.
+    }
+    assert (sum (map f l) = r). {
+      assert (Permutation (map f l) (map f (zero_list ++ pos_list))). {
+        apply Permutation_map.
+        auto.
+      }
+      assert (sum (map f l) = sum (map f (zero_list ++ pos_list)))%R. {
+        apply sum_congr.
+        auto.
+      }
+      rewrite H2.
+      clear - Hzero Hpos Hsumpos.
+      induction zero_list as [| a0 zero_list IH].
+      + simpl.
+        lra.
+      + simpl.
+        pose proof Hzero a0 (or_introl eq_refl) as Hf0.
+        assert (forall a : A, In a zero_list -> f a = 0%R). {
+          intros.
+          apply Hzero.
+          right; auto.
+        }
+        specialize (IH H).
+        lra.
+    }
+    pose proof nonneg_sublist_sum_le l f r (a :: subl) H0 H1 as Hsumge.
+    (* Search incl. *)
+    assert (In a l). {
+      apply Permutation_in with (l := zero_list ++ pos_list); auto.
+      apply Permutation_sym; auto.
+      apply in_or_app.
+      right; auto.
+    }
+    pose proof incl_cons H2 Hsubl.
+    specialize (Hsumge H3).
+    assert (NoDup (a :: subl)) as Hnodupasubl. {
+      constructor; auto.
+    }
+    specialize (Hsumge Hnodupasubl Hnodupl).
+    lra.
+Qed.
